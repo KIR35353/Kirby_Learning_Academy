@@ -1,0 +1,125 @@
+// Kirby Learning Academy — Prisma Schema
+// Phase 1: Tenant, User, Session foundations
+// Run: npx prisma migrate dev --name init
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  // Connection URL is configured in prisma.config.ts (Prisma 7+)
+}
+
+// ── Tenants (business units / multi-tenancy) ────────────────────────────────
+model Tenant {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique  // used in subdomain / header routing
+  logoUrl   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users     User[]
+
+  @@map("tenants")
+}
+
+// ── Users ────────────────────────────────────────────────────────────────────
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  emailVerified DateTime?
+  name          String?
+  displayName   String?
+  avatarUrl     String?
+  passwordHash  String?   // null for SSO-only accounts
+  isActive      Boolean   @default(true)
+  isContractor  Boolean   @default(false)  // contractor / external flag
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  tenantId      String
+  tenant        Tenant    @relation(fields: [tenantId], references: [id])
+
+  roles         UserRole[]
+  sessions      Session[]
+  accounts      Account[]  // OAuth / SAML providers (NextAuth)
+
+  @@index([tenantId])
+  @@map("users")
+}
+
+// ── Roles & Permissions ──────────────────────────────────────────────────────
+model Role {
+  id          String   @id @default(cuid())
+  name        String   @unique  // SUPER_ADMIN | TENANT_ADMIN | COMPLIANCE_OFFICER | MANAGER | INSTRUCTOR | EMPLOYEE | CONTRACTOR
+  description String?
+  createdAt   DateTime @default(now())
+
+  userRoles UserRole[]
+
+  @@map("roles")
+}
+
+model UserRole {
+  id        String   @id @default(cuid())
+  userId    String
+  roleId    String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id])
+
+  @@unique([userId, roleId])
+  @@index([userId])
+  @@map("user_roles")
+}
+
+// ── Sessions (NextAuth database sessions) ───────────────────────────────────
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  createdAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+// ── OAuth / SAML Accounts (NextAuth) ────────────────────────────────────────
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String  // "oauth" | "saml" | "credentials"
+  provider          String  // "azure-ad" | "okta" | "credentials"
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+  @@map("accounts")
+}
+
+// ── Verification Tokens (email / password reset) ────────────────────────────
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
