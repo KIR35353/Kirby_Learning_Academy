@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import { SessionProvider } from "next-auth/react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import "./globals.css";
 
@@ -27,7 +28,9 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${inter.variable} h-full antialiased`}>
       <body className="min-h-full bg-background text-foreground">
-        <TooltipProvider delay={300}>{children}</TooltipProvider>
+        <SessionProvider>
+          <TooltipProvider delay={300}>{children}</TooltipProvider>
+        </SessionProvider>
       </body>
     </html>
   );

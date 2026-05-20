@@ -1,6 +1,6 @@
 // Kirby Learning Academy — Prisma Schema
-// Phase 1: Tenant, User, Session foundations
-// Run: npx prisma migrate dev --name init
+// Phase 2: Auth, RBAC, User Management, Org structure
+// Run: npx prisma migrate dev --name phase2_auth_users
 
 generator client {
   provider = "prisma-client"
@@ -14,16 +14,69 @@ datasource db {
 
 // ── Tenants (business units / multi-tenancy) ────────────────────────────────
 model Tenant {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique  // used in subdomain / header routing
+  logoUrl     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users       User[]
+  departments Department[]
+  locations   Location[]
+  jobTitles   JobTitle[]
+
+  @@map("tenants")
+}
+
+// ── Org Structure ────────────────────────────────────────────────────────────
+model Department {
   id        String   @id @default(cuid())
   name      String
-  slug      String   @unique  // used in subdomain / header routing
-  logoUrl   String?
+  code      String?
+  tenantId  String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
   users     User[]
 
-  @@map("tenants")
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@map("departments")
+}
+
+model Location {
+  id        String   @id @default(cuid())
+  name      String
+  city      String?
+  state     String?
+  country   String   @default("US")
+  tenantId  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  users     User[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@map("locations")
+}
+
+model JobTitle {
+  id        String   @id @default(cuid())
+  name      String
+  tenantId  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  users     User[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@map("job_titles")
 }
 
 // ── Users ────────────────────────────────────────────────────────────────────
@@ -37,17 +90,27 @@ model User {
   passwordHash  String?   // null for SSO-only accounts
   isActive      Boolean   @default(true)
   isContractor  Boolean   @default(false)  // contractor / external flag
+  hireDate      DateTime?
+  bio           String?   @db.Text
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
   tenantId      String
-  tenant        Tenant    @relation(fields: [tenantId], references: [id])
+  tenant        Tenant     @relation(fields: [tenantId], references: [id])
+  departmentId  String?
+  department    Department? @relation(fields: [departmentId], references: [id])
+  locationId    String?
+  location      Location?   @relation(fields: [locationId], references: [id])
+  jobTitleId    String?
+  jobTitle      JobTitle?   @relation(fields: [jobTitleId], references: [id])
 
   roles         UserRole[]
   sessions      Session[]
   accounts      Account[]  // OAuth / SAML providers (NextAuth)
+  passwordResets PasswordResetToken[]
 
   @@index([tenantId])
+  @@index([email])
   @@map("users")
 }
 
@@ -121,5 +184,20 @@ model VerificationToken {
 
   @@unique([identifier, token])
   @@map("verification_tokens")
+}
+
+// ── Password Reset Tokens ────────────────────────────────────────────────────
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  expires   DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("password_reset_tokens")
 }
 

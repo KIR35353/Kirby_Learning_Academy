@@ -1,8 +1,18 @@
+import { auth } from "@/lib/auth";
+import { redirect } from "next/navigation";
 import { Sidebar, TopNav, PageShell, Footer } from "@/components/layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BookOpen, ShieldCheck, Award, TrendingUp } from "lucide-react";
 
-export default function HomePage() {
+export default async function HomePage() {
+  const session = await auth();
+  if (!session) redirect("/login");
+
+  const displayName =
+    (session.user as Record<string, unknown>)?.name as string | undefined ??
+    session.user?.email ??
+    "there";
+
   return (
     <div className="flex h-screen overflow-hidden">
       <Sidebar />
@@ -17,7 +27,7 @@ export default function HomePage() {
               Kirby Learning Academy
             </p>
             <h2 className="mt-1 text-2xl font-bold text-k-navy">
-              Welcome back, Demo User
+              Welcome back, {displayName}
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
               You have{" "}
