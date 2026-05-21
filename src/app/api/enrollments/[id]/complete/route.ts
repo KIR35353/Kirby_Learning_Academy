@@ -48,5 +48,19 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     },
   });
 
+  // Auto-grant skills mapped to this course on pass
+  if (finalPassed) {
+    const courseSkills = await db.courseSkill.findMany({
+      where: { courseId: enrollment.courseId },
+    });
+    for (const cs of courseSkills) {
+      await db.userSkill.upsert({
+        where: { userId_skillId: { userId: session.user.id!, skillId: cs.skillId } },
+        update: { level: cs.levelGrant, source: "course_completion", sourceId: id },
+        create: { userId: session.user.id!, skillId: cs.skillId, level: cs.levelGrant, source: "course_completion", sourceId: id },
+      });
+    }
+  }
+
   return NextResponse.json(updated);
 }

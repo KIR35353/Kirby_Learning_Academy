@@ -15,6 +15,7 @@ import {
   Network,
   RefreshCw,
   Building,
+  TrendingUp,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Separator } from "@/components/ui/separator";
@@ -32,6 +33,7 @@ const studentNav: NavItem[] = [
   { label: "Dashboard",     href: "/dashboard",    icon: LayoutDashboard },
   { label: "My Courses",    href: "/my-courses",   icon: BookOpen },
   { label: "My Learning",   href: "/my-learning",  icon: GraduationCap },
+  { label: "My Skills",     href: "/my-skills",    icon: TrendingUp },
   { label: "Assessments",   href: "/assessments",  icon: ClipboardList },
   { label: "Course Catalog",href: "/catalog",      icon: BookOpen },
   { label: "Certifications",href: "/certs",        icon: Award },
@@ -45,9 +47,11 @@ const adminNav: NavItem[] = [
   { label: "Courses",         href: "/admin/courses",         icon: BookOpen },
   { label: "Learning Paths",  href: "/admin/learning-paths",  icon: GraduationCap },
   { label: "Curricula",       href: "/admin/curricula",       icon: ClipboardList },
+  { label: "Assessments",     href: "/admin/assessments",     icon: ClipboardList },
+  { label: "Skills Library",  href: "/admin/skills",          icon: TrendingUp },
+  { label: "Skills Matrix",   href: "/admin/skills/matrix",   icon: BarChart3 },
   { label: "Compliance",      href: "/admin/compliance",      icon: ShieldCheck },
   { label: "Reports",         href: "/admin/reports",         icon: BarChart3 },
-  { label: "Assessments",     href: "/admin/assessments",     icon: ClipboardList },
   { label: "Settings",        href: "/admin/settings",        icon: Settings },
 ];
 

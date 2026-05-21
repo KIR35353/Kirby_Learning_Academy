@@ -149,6 +149,15 @@ export async function POST(
     totalPoints,
     passingScore: assessment?.passingScore ?? 80,
     remediationCourseId: !passed ? assessment?.remediationCourseId : null,
+    answers: gradedAnswers.map((a) => ({
+      questionId: a.questionId,
+      isCorrect: a.isCorrect,
+      pointsEarned: a.pointsEarned,
+      selectedOptionIds: a.selectedOptionIds,
+      acknowledged: a.acknowledged,
+      correctOptionIds: questions.find((q) => q.id === a.questionId)?.options.filter((o) => o.isCorrect).map((o) => o.id) ?? [],
+      explanation: questions.find((q) => q.id === a.questionId)?.explanation ?? null,
+    })),
     questions: questionResults,
   });
 }

@@ -1,6 +1,5 @@
 // Kirby Learning Academy — Prisma Schema
-// Phase 7: Standalone Assessments & Attestations
-// Run: npx prisma migrate dev --name phase6_learning_paths
+// Phase 8: Skills Matrix & Competency Tracking
 
 generator client {
   provider = "prisma-client"
@@ -32,6 +31,8 @@ model Tenant {
   learningPaths LearningPath[]
   curricula    Curriculum[]
   assessments  StandaloneAssessment[]
+  skills        Skill[]
+  skillCategories SkillCategory[]
 
   @@map("tenants")
 }
@@ -110,6 +111,7 @@ model JobTitle {
 
   tenant    Tenant   @relation(fields: [tenantId], references: [id])
   users     User[]
+  skillRequirements RoleSkillRequirement[]
 
   @@unique([tenantId, name])
   @@index([tenantId])
@@ -163,6 +165,8 @@ model User {
   assessmentAttempts    AssessmentAttempt[]    @relation("UserAssessmentAttempts")
   assessmentAssignments AssessmentAssignment[] @relation("UserAssessmentAssignments")
   assignedAssessments   AssessmentAssignment[] @relation("AssessmentAssignedBy")
+  userSkills            UserSkill[]            @relation("UserSkills")
+  endorsedSkills        UserSkill[]            @relation("SkillEndorser")
 
   @@index([tenantId])
   @@index([email])
@@ -314,6 +318,7 @@ model Course {
   enrollments        Enrollment[]
   learningPathCourses LearningPathCourse[]
   remediationFor     StandaloneAssessment[]
+  courseSkills       CourseSkill[]
 
   @@index([tenantId])
   @@index([status])
@@ -645,4 +650,98 @@ model AttemptAnswer {
   @@unique([attemptId, questionId])
   @@index([attemptId])
   @@map("attempt_answers")
+}
+
+// ── Skills Matrix & Competency Tracking (Phase 8) ────────────────────────────
+
+model SkillCategory {
+  id        String   @id @default(cuid())
+  tenantId  String
+  name      String
+  createdAt DateTime @default(now())
+
+  tenant Tenant  @relation(fields: [tenantId], references: [id])
+  skills Skill[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@map("skill_categories")
+}
+
+model Skill {
+  id          String  @id @default(cuid())
+  tenantId    String
+  categoryId  String?
+  name        String
+  description String? @db.Text
+  // Proficiency levels: stored as labels e.g. ["Awareness","Developing","Proficient","Advanced","Expert"]
+  // Index 0 = lowest, last = highest. Default 5-level 1-indexed scale.
+  levelLabels String[] // ordered labels for levels 1..N; empty = use numeric 1–5
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant           Tenant                 @relation(fields: [tenantId], references: [id])
+  category         SkillCategory?         @relation(fields: [categoryId], references: [id])
+  userSkills       UserSkill[]
+  courseSkills     CourseSkill[]
+  roleRequirements RoleSkillRequirement[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@index([categoryId])
+  @@map("skills")
+}
+
+// Awarded proficiency a user has for a skill
+model UserSkill {
+  id           String   @id @default(cuid())
+  userId       String
+  skillId      String
+  level        Int      // 1-based index into Skill.levelLabels (or 1–5 if custom empty)
+  source       String   // "manual" | "course_completion" | "assessment"
+  sourceId     String?  // enrollment/attempt id that granted this
+  endorsedById String?  // manager/instructor who manually endorsed
+  notes        String?
+  grantedAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user       User   @relation("UserSkills", fields: [userId], references: [id], onDelete: Cascade)
+  skill      Skill  @relation(fields: [skillId], references: [id], onDelete: Cascade)
+  endorsedBy User?  @relation("SkillEndorser", fields: [endorsedById], references: [id])
+
+  @@unique([userId, skillId])   // one record per user+skill (upsert on new grant)
+  @@index([userId])
+  @@index([skillId])
+  @@map("user_skills")
+}
+
+// Skills granted on completing a course
+model CourseSkill {
+  id         String @id @default(cuid())
+  courseId   String
+  skillId    String
+  levelGrant Int    @default(1) // minimum level awarded on completion
+
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  skill  Skill  @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@unique([courseId, skillId])
+  @@index([courseId])
+  @@map("course_skills")
+}
+
+// Minimum required skill level for a job title
+model RoleSkillRequirement {
+  id           String @id @default(cuid())
+  jobTitleId   String
+  skillId      String
+  requiredLevel Int   @default(1)
+
+  jobTitle JobTitle @relation(fields: [jobTitleId], references: [id], onDelete: Cascade)
+  skill    Skill    @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@unique([jobTitleId, skillId])
+  @@index([jobTitleId])
+  @@map("role_skill_requirements")
 }
