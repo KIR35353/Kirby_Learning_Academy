@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import Image from "next/image";
@@ -24,7 +24,8 @@ interface Props {
   authMode: AuthMode;
 }
 
-export function LoginClient({ authMode }: Props) {
+// Inner component — isolated so the Suspense boundary catches useSearchParams
+function LoginForm({ authMode }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") ?? "/";
@@ -101,7 +102,6 @@ export function LoginClient({ authMode }: Props) {
                 {ssoLoading ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : (
-                  /* Microsoft logo SVG */
                   <svg
                     className="mr-2 h-4 w-4 shrink-0"
                     viewBox="0 0 21 21"
@@ -119,7 +119,7 @@ export function LoginClient({ authMode }: Props) {
             </div>
           )}
 
-          {/* Divider between SSO and credentials */}
+          {/* Divider */}
           {showSso && showCredentials && (
             <div className="mb-5 flex items-center gap-3">
               <div className="h-px flex-1 bg-white/10" />
@@ -139,9 +139,7 @@ export function LoginClient({ authMode }: Props) {
               )}
 
               <div className="space-y-1.5">
-                <Label htmlFor="email" className="text-white/80">
-                  Email Address
-                </Label>
+                <Label htmlFor="email" className="text-white/80">Email Address</Label>
                 <Input
                   id="email"
                   type="email"
@@ -150,20 +148,13 @@ export function LoginClient({ authMode }: Props) {
                   className="border-white/20 bg-white/10 text-white placeholder:text-white/30 focus-visible:border-white/40 focus-visible:ring-0"
                   {...register("email")}
                 />
-                {errors.email && (
-                  <p className="text-xs text-red-400">{errors.email.message}</p>
-                )}
+                {errors.email && <p className="text-xs text-red-400">{errors.email.message}</p>}
               </div>
 
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="password" className="text-white/80">
-                    Password
-                  </Label>
-                  <a
-                    href="/forgot-password"
-                    className="text-xs text-white/50 hover:text-white/80 transition-colors"
-                  >
+                  <Label htmlFor="password" className="text-white/80">Password</Label>
+                  <a href="/forgot-password" className="text-xs text-white/50 hover:text-white/80 transition-colors">
                     Forgot password?
                   </a>
                 </div>
@@ -175,9 +166,7 @@ export function LoginClient({ authMode }: Props) {
                   className="border-white/20 bg-white/10 text-white placeholder:text-white/30 focus-visible:border-white/40 focus-visible:ring-0"
                   {...register("password")}
                 />
-                {errors.password && (
-                  <p className="text-xs text-red-400">{errors.password.message}</p>
-                )}
+                {errors.password && <p className="text-xs text-red-400">{errors.password.message}</p>}
               </div>
 
               <Button
@@ -186,15 +175,9 @@ export function LoginClient({ authMode }: Props) {
                 className="w-full bg-[#cc3d00] text-white hover:bg-[#b33400] disabled:opacity-60"
               >
                 {isSubmitting ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Signing in…
-                  </>
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Signing in…</>
                 ) : (
-                  <>
-                    <LogIn className="mr-2 h-4 w-4" />
-                    Sign In
-                  </>
+                  <><LogIn className="mr-2 h-4 w-4" />Sign In</>
                 )}
               </Button>
             </form>
@@ -206,5 +189,13 @@ export function LoginClient({ authMode }: Props) {
         </p>
       </div>
     </div>
+  );
+}
+
+export function LoginClient({ authMode }: Props) {
+  return (
+    <Suspense>
+      <LoginForm authMode={authMode} />
+    </Suspense>
   );
 }

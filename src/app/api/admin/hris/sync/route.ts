@@ -31,7 +31,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "csvContent is required for CSV source" }, { status: 400 });
   }
 
-  const job = await hrisSyncQueue.add(
+  const job = await hrisSyncQueue().add(
     "manual-hris-sync",
     { tenantId, source: parsed.data.source, csvContent: parsed.data.csvContent },
     { attempts: 2, backoff: { type: "fixed", delay: 5000 } },

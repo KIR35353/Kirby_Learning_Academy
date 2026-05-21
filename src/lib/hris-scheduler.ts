@@ -17,17 +17,27 @@ import type { HrisSyncJobData } from "@/workers/hris-sync-worker";
 
 const HRIS_SYNC_CRON = process.env.HRIS_SYNC_CRON ?? "0 2 * * *"; // 02:00 UTC
 
-const hrisSyncQueue = new Queue<HrisSyncJobData>("hris-sync", {
-  connection: redisConnection,
-});
+// Lazy singleton — Queue is not created until first use so Next.js build-time
+// static generation never tries to open a Redis connection.
+let _hrisSyncQueue: Queue<HrisSyncJobData> | null = null;
+
+function getHrisSyncQueue(): Queue<HrisSyncJobData> {
+  if (!_hrisSyncQueue) {
+    _hrisSyncQueue = new Queue<HrisSyncJobData>("hris-sync", {
+      connection: redisConnection,
+    });
+  }
+  return _hrisSyncQueue;
+}
 
 export async function scheduleHrisSync(
   tenants: Array<{ tenantId: string; source: "workday" | "successfactors" | "csv" }>,
 ): Promise<void> {
+  const queue = getHrisSyncQueue();
   for (const { tenantId, source } of tenants) {
     const jobName = `nightly-hris-sync:${tenantId}`;
 
-    await hrisSyncQueue.upsertJobScheduler(jobName, { pattern: HRIS_SYNC_CRON }, {
+    await queue.upsertJobScheduler(jobName, { pattern: HRIS_SYNC_CRON }, {
       name: jobName,
       data: { tenantId, source },
       opts: {
@@ -40,4 +50,4 @@ export async function scheduleHrisSync(
   console.log(`[hris-scheduler] Scheduled ${tenants.length} tenant sync(s) — cron: ${HRIS_SYNC_CRON}`);
 }
 
-export { hrisSyncQueue };
+export { getHrisSyncQueue as hrisSyncQueue };

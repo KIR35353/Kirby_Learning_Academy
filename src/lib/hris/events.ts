@@ -28,13 +28,20 @@ export interface RoleChangePayload {
 
 export type HrisEventPayload = NewHirePayload | RoleChangePayload;
 
-const hrisEventQueue = new Queue("hris-events", { connection: redisConnection });
+// Lazy singleton — not created until first emit
+let _hrisEventQueue: Queue | null = null;
+function getHrisEventQueue(): Queue {
+  if (!_hrisEventQueue) {
+    _hrisEventQueue = new Queue("hris-events", { connection: redisConnection });
+  }
+  return _hrisEventQueue;
+}
 
 export async function emitHrisEvent(
   type: HrisEventType,
   payload: HrisEventPayload,
 ): Promise<void> {
-  await hrisEventQueue.add(type, payload, {
+  await getHrisEventQueue().add(type, payload, {
     attempts: 3,
     backoff: { type: "exponential", delay: 5000 },
   });

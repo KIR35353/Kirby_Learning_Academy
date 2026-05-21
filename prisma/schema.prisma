@@ -1,6 +1,6 @@
 // Kirby Learning Academy — Prisma Schema
-// Phase 3: Org hierarchy, BusinessUnit, HRIS sync support
-// Run: npx prisma migrate dev --name phase3_org_hierarchy
+// Phase 4: Course publishing, versions, catalog
+// Run: npx prisma migrate dev --name phase4_courses
 
 generator client {
   provider = "prisma-client"
@@ -27,6 +27,7 @@ model Tenant {
   locations   Location[]
   jobTitles   JobTitle[]
   hrisSyncLogs HrisSyncLog[]
+  courses     Course[]
 
   @@map("tenants")
 }
@@ -146,6 +147,8 @@ model User {
   sessions      Session[]
   accounts      Account[]  // OAuth / SAML providers (NextAuth)
   passwordResets PasswordResetToken[]
+  createdCourses Course[]        @relation("CourseCreator")
+  uploadedVersions CourseVersion[] @relation("VersionUploader")
 
   @@index([tenantId])
   @@index([email])
@@ -258,5 +261,90 @@ model HrisSyncLog {
   @@index([tenantId])
   @@index([startedAt])
   @@map("hris_sync_logs")
+}
+
+// ── Course Publishing ────────────────────────────────────────────────────────
+
+enum CourseStatus {
+  DRAFT
+  REVIEW
+  PUBLISHED
+  ARCHIVED
+}
+
+model Course {
+  id                   String       @id @default(cuid())
+  tenantId             String
+  title                String
+  description          String?      @db.Text
+  category             String?
+  objectives           String[]     // auto-populated from manifest
+  duration             Int?         // estimated minutes
+  thumbnailUrl         String?
+  targetAudience       String?      @db.Text
+  complianceTags       String[]     // e.g. ["OSHA","USCG","Maritime"]
+  isContractorVisible  Boolean      @default(false)
+  status               CourseStatus @default(DRAFT)
+  activeVersionId      String?      @unique
+  createdById          String
+  archivedAt           DateTime?
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+
+  tenant        Tenant          @relation(fields: [tenantId], references: [id])
+  createdBy     User            @relation("CourseCreator", fields: [createdById], references: [id])
+  activeVersion CourseVersion?  @relation("ActiveVersion", fields: [activeVersionId], references: [id])
+  versions      CourseVersion[] @relation("CourseVersions")
+  tags          CourseTag[]
+  languages     CourseLanguage[]
+
+  @@index([tenantId])
+  @@index([status])
+  @@index([tenantId, status])
+  @@map("courses")
+}
+
+model CourseVersion {
+  id               String   @id @default(cuid())
+  courseId         String
+  versionNumber    Int      // 1, 2, 3, ...
+  s3Prefix         String   // e.g. "courses/clxxx/v1/"
+  manifestSnapshot Json     // parsed _course_manifest.json at upload time
+  originalFileName String?
+  fileSizeBytes    Int?
+  uploadedById     String
+  uploadedAt       DateTime @default(now())
+
+  course       Course   @relation("CourseVersions", fields: [courseId], references: [id], onDelete: Cascade)
+  uploadedBy   User     @relation("VersionUploader", fields: [uploadedById], references: [id])
+  activeFor    Course?  @relation("ActiveVersion")
+
+  @@unique([courseId, versionNumber])
+  @@index([courseId])
+  @@map("course_versions")
+}
+
+model CourseTag {
+  id       String @id @default(cuid())
+  courseId String
+  tag      String
+
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([courseId, tag])
+  @@index([courseId])
+  @@map("course_tags")
+}
+
+model CourseLanguage {
+  id        String  @id @default(cuid())
+  courseId  String
+  language  String  // ISO 639-1 e.g. "en", "es"
+  isDefault Boolean @default(false)
+
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([courseId, language])
+  @@map("course_languages")
 }
 

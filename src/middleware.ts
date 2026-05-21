@@ -41,9 +41,14 @@ export default auth((req: NextAuthRequest) => {
   const user = req.auth?.user as Record<string, unknown> | undefined;
   const roles: string[] = (user?.roles as string[]) ?? [];
 
-  // Admin routes require SUPER_ADMIN or TENANT_ADMIN
+  // Admin routes require SUPER_ADMIN or TENANT_ADMIN (plus INSTRUCTOR for course pages)
   if (adminRoutes.some((r) => pathname.startsWith(r))) {
-    if (!roles.includes("SUPER_ADMIN") && !roles.includes("TENANT_ADMIN")) {
+    const instructorAllowed = pathname.startsWith("/admin/courses");
+    const allowed =
+      roles.includes("SUPER_ADMIN") ||
+      roles.includes("TENANT_ADMIN") ||
+      (instructorAllowed && roles.includes("INSTRUCTOR"));
+    if (!allowed) {
       return NextResponse.redirect(new URL("/unauthorized", req.url));
     }
   }
