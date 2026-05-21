@@ -29,22 +29,25 @@ type NavItem = {
 };
 
 const studentNav: NavItem[] = [
-  { label: "Dashboard",     href: "/dashboard",   icon: LayoutDashboard },
-  { label: "My Courses",    href: "/my-courses",  icon: BookOpen },
-  { label: "Course Catalog",href: "/catalog",     icon: GraduationCap },
-  { label: "Certifications",href: "/certs",       icon: Award },
+  { label: "Dashboard",     href: "/dashboard",    icon: LayoutDashboard },
+  { label: "My Courses",    href: "/my-courses",   icon: BookOpen },
+  { label: "My Learning",   href: "/my-learning",  icon: GraduationCap },
+  { label: "Course Catalog",href: "/catalog",      icon: BookOpen },
+  { label: "Certifications",href: "/certs",        icon: Award },
 ];
 
 const adminNav: NavItem[] = [
-  { label: "Users",         href: "/admin/users",       icon: Users },
-  { label: "Org Structure", href: "/admin/org",         icon: Network },
-  { label: "HRIS Sync",     href: "/admin/hris",        icon: RefreshCw },
-  { label: "Tenants",       href: "/admin/tenants",     icon: Building },
-  { label: "Courses",       href: "/admin/courses",     icon: BookOpen },
-  { label: "Compliance",    href: "/admin/compliance",  icon: ShieldCheck },
-  { label: "Reports",       href: "/admin/reports",     icon: BarChart3 },
-  { label: "Assessments",   href: "/admin/assessments", icon: ClipboardList },
-  { label: "Settings",      href: "/admin/settings",    icon: Settings },
+  { label: "Users",           href: "/admin/users",           icon: Users },
+  { label: "Org Structure",   href: "/admin/org",             icon: Network },
+  { label: "HRIS Sync",       href: "/admin/hris",            icon: RefreshCw },
+  { label: "Tenants",         href: "/admin/tenants",         icon: Building },
+  { label: "Courses",         href: "/admin/courses",         icon: BookOpen },
+  { label: "Learning Paths",  href: "/admin/learning-paths",  icon: GraduationCap },
+  { label: "Curricula",       href: "/admin/curricula",       icon: ClipboardList },
+  { label: "Compliance",      href: "/admin/compliance",      icon: ShieldCheck },
+  { label: "Reports",         href: "/admin/reports",         icon: BarChart3 },
+  { label: "Assessments",     href: "/admin/assessments",     icon: ClipboardList },
+  { label: "Settings",        href: "/admin/settings",        icon: Settings },
 ];
 
 // ── Component ──────────────────────────────────────────────────────────────

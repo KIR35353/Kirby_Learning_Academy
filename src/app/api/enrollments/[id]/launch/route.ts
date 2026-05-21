@@ -29,6 +29,33 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (enrollment.course.status !== "PUBLISHED")
     return NextResponse.json({ error: "Course is not published" }, { status: 409 });
 
+  // Check learning path prerequisites
+  const learningPathCourses = await db.learningPathCourse.findMany({
+    where: { courseId: enrollment.courseId, prerequisiteCourseId: { not: null } },
+    select: { prerequisiteCourseId: true },
+  });
+
+  if (learningPathCourses.length > 0) {
+    const prereqCourseIds = learningPathCourses
+      .map((lpc) => lpc.prerequisiteCourseId!)
+      .filter(Boolean);
+
+    const passedPrereqs = await db.enrollment.count({
+      where: {
+        userId: session.user.id,
+        courseId: { in: prereqCourseIds },
+        status: { in: ["PASSED", "COMPLETED"] },
+      },
+    });
+
+    if (passedPrereqs < prereqCourseIds.length) {
+      return NextResponse.json(
+        { error: "Prerequisite course not yet completed" },
+        { status: 403 }
+      );
+    }
+  }
+
   const s3Prefix =
     enrollment.courseVersion?.s3Prefix ??
     enrollment.course.activeVersion?.s3Prefix;

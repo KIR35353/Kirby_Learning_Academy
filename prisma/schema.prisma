@@ -1,6 +1,6 @@
 // Kirby Learning Academy — Prisma Schema
-// Phase 5: Enrollment, learning delivery, completion tracking
-// Run: npx prisma migrate dev --name phase5_enrollments
+// Phase 6: Learning Paths & Curricula
+// Run: npx prisma migrate dev --name phase6_learning_paths
 
 generator client {
   provider = "prisma-client"
@@ -27,8 +27,10 @@ model Tenant {
   locations   Location[]
   jobTitles   JobTitle[]
   hrisSyncLogs HrisSyncLog[]
-  courses     Course[]
-  enrollments Enrollment[]
+  courses      Course[]
+  enrollments  Enrollment[]
+  learningPaths LearningPath[]
+  curricula    Curriculum[]
 
   @@map("tenants")
 }
@@ -70,7 +72,8 @@ model Department {
 
   tenant       Tenant        @relation(fields: [tenantId], references: [id])
   businessUnit BusinessUnit? @relation(fields: [businessUnitId], references: [id])
-  users        User[]
+  users                User[]
+  curriculumAssignments CurriculumAssignment[]
 
   @@unique([tenantId, name])
   @@index([tenantId])
@@ -150,8 +153,10 @@ model User {
   passwordResets PasswordResetToken[]
   createdCourses Course[]        @relation("CourseCreator")
   uploadedVersions CourseVersion[] @relation("VersionUploader")
-  enrollments     Enrollment[]    @relation("EnrolledUser")
-  assignedEnrollments Enrollment[] @relation("AssignedBy")
+  enrollments           Enrollment[]           @relation("EnrolledUser")
+  assignedEnrollments   Enrollment[]           @relation("AssignedBy")
+  curriculumAssignments CurriculumAssignment[] @relation("UserCurriculumAssignments")
+  assignedCurricula     CurriculumAssignment[] @relation("CurriculumAssignedBy")
 
   @@index([tenantId])
   @@index([email])
@@ -298,9 +303,10 @@ model Course {
   createdBy     User            @relation("CourseCreator", fields: [createdById], references: [id])
   activeVersion CourseVersion?  @relation("ActiveVersion", fields: [activeVersionId], references: [id])
   versions      CourseVersion[] @relation("CourseVersions")
-  tags          CourseTag[]
-  languages     CourseLanguage[]
-  enrollments   Enrollment[]
+  tags               CourseTag[]
+  languages          CourseLanguage[]
+  enrollments        Enrollment[]
+  learningPathCourses LearningPathCourse[]
 
   @@index([tenantId])
   @@index([status])
@@ -396,3 +402,92 @@ model Enrollment {
   @@map("enrollments")
 }
 
+// ── Learning Paths & Curricula ───────────────────────────────────────────────
+
+model LearningPath {
+  id          String   @id @default(cuid())
+  tenantId    String
+  title       String
+  description String?  @db.Text
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant    Tenant               @relation(fields: [tenantId], references: [id])
+  courses   LearningPathCourse[]
+  curricula CurriculumPath[]
+
+  @@index([tenantId])
+  @@map("learning_paths")
+}
+
+model LearningPathCourse {
+  id                   String  @id @default(cuid())
+  learningPathId       String
+  courseId             String
+  order                Int     @default(0)
+  isRequired           Boolean @default(true)
+  prerequisiteCourseId String? // must have PASSED this courseId before launching this course
+
+  learningPath LearningPath @relation(fields: [learningPathId], references: [id], onDelete: Cascade)
+  course       Course       @relation(fields: [courseId], references: [id])
+
+  @@unique([learningPathId, courseId])
+  @@index([learningPathId])
+  @@map("learning_path_courses")
+}
+
+model Curriculum {
+  id          String   @id @default(cuid())
+  tenantId    String
+  title       String
+  description String?  @db.Text
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant      Tenant                 @relation(fields: [tenantId], references: [id])
+  paths       CurriculumPath[]
+  assignments CurriculumAssignment[]
+
+  @@index([tenantId])
+  @@map("curricula")
+}
+
+model CurriculumPath {
+  id             String @id @default(cuid())
+  curriculumId   String
+  learningPathId String
+  order          Int    @default(0)
+
+  curriculum   Curriculum   @relation(fields: [curriculumId], references: [id], onDelete: Cascade)
+  learningPath LearningPath @relation(fields: [learningPathId], references: [id])
+
+  @@unique([curriculumId, learningPathId])
+  @@index([curriculumId])
+  @@map("curriculum_paths")
+}
+
+model CurriculumAssignment {
+  id           String    @id @default(cuid())
+  curriculumId String
+  tenantId     String
+  // Target: one of these will be set
+  roleName     String?   // e.g. "EMPLOYEE" — matches Role.name
+  departmentId String?
+  userId       String?
+  dueDate      DateTime?
+  assignedAt   DateTime  @default(now())
+  assignedById String?
+
+  curriculum Curriculum  @relation(fields: [curriculumId], references: [id], onDelete: Cascade)
+  department Department? @relation(fields: [departmentId], references: [id])
+  user       User?       @relation("UserCurriculumAssignments", fields: [userId], references: [id])
+  assignedBy User?       @relation("CurriculumAssignedBy", fields: [assignedById], references: [id])
+
+  @@index([curriculumId])
+  @@index([userId])
+  @@index([departmentId])
+  @@index([tenantId])
+  @@map("curriculum_assignments")
+}
