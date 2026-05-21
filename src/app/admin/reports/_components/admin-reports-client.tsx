@@ -1,0 +1,370 @@
+"use client";
+
+import { useEffect, useState, useCallback } from "react";
+import {
+  BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+} from "recharts";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Download, RefreshCw, Users, BookOpen, CheckCircle2, AlertTriangle } from "lucide-react";
+
+// ── Types ──────────────────────────────────────────────────────────────────
+
+interface Dept { id: string; name: string }
+interface CourseSummary { id: string; title: string }
+
+interface OverviewData {
+  totalUsers: number;
+  enrollments: { total: number; byStatus: Record<string, number>; completionRate: number; overdue: number };
+  certifications: { byStatus: Record<string, number> };
+  recentCompletions: { id: string; user: { name: string | null }; course: { title: string }; completedAt: string | null }[];
+  topCourses: { id: string; title: string; enrollmentCount: number }[];
+  completionsByMonth: { month: string; count: number }[];
+}
+
+interface CourseEffRow {
+  id: string; title: string; status: string;
+  totalEnrollments: number; completionRate: number; passRate: number; avgScore: number | null;
+}
+
+const PIE_COLORS = ["#22c55e", "#eab308", "#ef4444", "#94a3b8", "#f97316"];
+
+const STATUS_COLORS: Record<string, string> = {
+  PASSED: "#22c55e", COMPLETED: "#22c55e",
+  IN_PROGRESS: "#3b82f6",
+  NOT_STARTED: "#64748b",
+  FAILED: "#ef4444",
+};
+
+// ── Sub-components ─────────────────────────────────────────────────────────
+
+function StatCard({ icon, label, value, sub }: { icon: React.ReactNode; label: string; value: string | number; sub?: string }) {
+  return (
+    <Card className="bg-white/5 border-white/10 p-5 flex items-start gap-4">
+      <div className="shrink-0 mt-0.5">{icon}</div>
+      <div>
+        <p className="text-xs text-white/50">{label}</p>
+        <p className="text-2xl font-semibold text-white">{value}</p>
+        {sub && <p className="text-xs text-white/30 mt-0.5">{sub}</p>}
+      </div>
+    </Card>
+  );
+}
+
+// ── Main component ──────────────────────────────────────────────────────────
+
+export function AdminReportsClient({
+  departments, courses,
+}: { departments: Dept[]; courses: CourseSummary[] }) {
+  const [overview, setOverview] = useState<OverviewData | null>(null);
+  const [effectiveness, setEffectiveness] = useState<CourseEffRow[]>([]);
+  const [loadingOverview, setLoadingOverview] = useState(true);
+  const [loadingEff, setLoadingEff] = useState(true);
+  const [deptId, setDeptId] = useState("");
+  const [courseId, setCourseId] = useState("");
+  const [activeTab, setActiveTab] = useState<"overview" | "completions" | "effectiveness">("overview");
+
+  // Completion report filters
+  const [filterStatus, setFilterStatus] = useState("");
+  const [filterStart, setFilterStart] = useState("");
+  const [filterEnd, setFilterEnd] = useState("");
+
+  const loadOverview = useCallback(async () => {
+    setLoadingOverview(true);
+    const params = deptId ? `?departmentId=${deptId}` : "";
+    const res = await fetch(`/api/reports/overview${params}`);
+    if (res.ok) setOverview(await res.json());
+    setLoadingOverview(false);
+  }, [deptId]);
+
+  const loadEffectiveness = useCallback(async () => {
+    setLoadingEff(true);
+    const params = courseId ? `?courseId=${courseId}` : "";
+    const res = await fetch(`/api/reports/course-effectiveness${params}`);
+    if (res.ok) setEffectiveness(await res.json());
+    setLoadingEff(false);
+  }, [courseId]);
+
+  useEffect(() => { if (activeTab === "overview") loadOverview(); }, [activeTab, loadOverview]);
+  useEffect(() => { if (activeTab === "effectiveness") loadEffectiveness(); }, [activeTab, loadEffectiveness]);
+
+  function exportCompletions() {
+    const p = new URLSearchParams({ export: "csv" });
+    if (deptId) p.set("departmentId", deptId);
+    if (courseId) p.set("courseId", courseId);
+    if (filterStatus) p.set("status", filterStatus);
+    if (filterStart) p.set("startDate", filterStart);
+    if (filterEnd) p.set("endDate", filterEnd);
+    window.open(`/api/reports/completions?${p.toString()}`, "_blank");
+  }
+
+  const tabs: { key: typeof activeTab; label: string }[] = [
+    { key: "overview", label: "Overview" },
+    { key: "completions", label: "Completions Report" },
+    { key: "effectiveness", label: "Course Effectiveness" },
+  ];
+
+  const certPieData = overview ? Object.entries(overview.certifications.byStatus).map(([name, value]) => ({ name, value })) : [];
+  const enrollPieData = overview ? Object.entries(overview.enrollments.byStatus).map(([name, value]) => ({ name, value })) : [];
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-semibold text-white">Reports & Analytics</h2>
+          <p className="text-sm text-white/50">Org-wide training and compliance metrics</p>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <select value={deptId} onChange={(e) => setDeptId(e.target.value)}
+            className="rounded-lg bg-white/5 border border-white/10 text-white/70 px-3 py-1.5 text-sm">
+            <option value="">All departments</option>
+            {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+          </select>
+          <Button onClick={loadOverview} variant="outline" className="border-white/10 text-white/60 hover:bg-white/10 h-8 px-3">
+            <RefreshCw className="h-3.5 w-3.5 mr-1" /> Refresh
+          </Button>
+          <Button onClick={exportCompletions} className="bg-[#cc3d00] text-white hover:bg-[#b33400] h-8 px-3">
+            <Download className="h-3.5 w-3.5 mr-1" /> Export CSV
+          </Button>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-1 border-b border-white/10">
+        {tabs.map((t) => (
+          <button key={t.key} onClick={() => setActiveTab(t.key)}
+            className={`px-4 py-2 text-sm transition-colors ${activeTab === t.key ? "border-b-2 border-[#cc3d00] text-white" : "text-white/40 hover:text-white/70"}`}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ── OVERVIEW TAB ─────────────────────────────────────────────────── */}
+      {activeTab === "overview" && (
+        <div className="space-y-6">
+          {/* KPI cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {loadingOverview ? (
+              Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-xl bg-white/5" />)
+            ) : overview ? (
+              <>
+                <StatCard icon={<Users className="h-5 w-5 text-blue-400" />} label="Active Employees" value={overview.totalUsers} />
+                <StatCard icon={<BookOpen className="h-5 w-5 text-purple-400" />} label="Total Enrollments" value={overview.enrollments.total} />
+                <StatCard icon={<CheckCircle2 className="h-5 w-5 text-green-400" />} label="Completion Rate" value={`${overview.enrollments.completionRate}%`} />
+                <StatCard icon={<AlertTriangle className="h-5 w-5 text-red-400" />} label="Overdue Enrollments" value={overview.enrollments.overdue} sub="past due date" />
+              </>
+            ) : null}
+          </div>
+
+          {/* Charts row */}
+          {!loadingOverview && overview && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Completions over time */}
+              <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+                <h3 className="text-sm font-medium text-white/70 mb-4">Completions — Last 6 Months</h3>
+                <ResponsiveContainer width="100%" height={200}>
+                  <LineChart data={overview.completionsByMonth}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                    <XAxis dataKey="month" tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 11 }} />
+                    <YAxis tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 11 }} />
+                    <Tooltip contentStyle={{ background: "#0a1628", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#fff" }} />
+                    <Line type="monotone" dataKey="count" stroke="#cc3d00" strokeWidth={2} dot={{ fill: "#cc3d00" }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Enrollment status pie */}
+              <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+                <h3 className="text-sm font-medium text-white/70 mb-4">Enrollment Status Distribution</h3>
+                <ResponsiveContainer width="100%" height={200}>
+                  <PieChart>
+                    <Pie data={enrollPieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={75} label={({ name, percent }) => `${name.replace("_", " ")} ${Math.round(percent * 100)}%`} labelLine={false}>
+                      {enrollPieData.map((entry, i) => (
+                        <Cell key={entry.name} fill={STATUS_COLORS[entry.name] ?? PIE_COLORS[i % PIE_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip contentStyle={{ background: "#0a1628", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#fff" }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Top courses */}
+              <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+                <h3 className="text-sm font-medium text-white/70 mb-4">Top Courses by Enrollment</h3>
+                <ResponsiveContainer width="100%" height={200}>
+                  <BarChart data={overview.topCourses} layout="vertical">
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                    <XAxis type="number" tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 11 }} />
+                    <YAxis type="category" dataKey="title" width={140} tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 10 }} />
+                    <Tooltip contentStyle={{ background: "#0a1628", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#fff" }} />
+                    <Bar dataKey="enrollmentCount" fill="#cc3d00" radius={[0, 4, 4, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Cert status pie */}
+              {certPieData.length > 0 && (
+                <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+                  <h3 className="text-sm font-medium text-white/70 mb-4">Certification Status</h3>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <PieChart>
+                      <Pie data={certPieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={75} label={({ name, percent }) => `${name.replace("_", " ")} ${Math.round(percent * 100)}%`} labelLine={false}>
+                        {certPieData.map((entry, i) => (
+                          <Cell key={entry.name} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip contentStyle={{ background: "#0a1628", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#fff" }} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Recent completions */}
+          {!loadingOverview && overview && overview.recentCompletions.length > 0 && (
+            <div className="rounded-xl border border-white/10 bg-white/5">
+              <h3 className="text-sm font-medium text-white/70 px-4 py-3 border-b border-white/10">Recent Completions (Last 30 Days)</h3>
+              <div className="divide-y divide-white/5">
+                {overview.recentCompletions.map((r) => (
+                  <div key={r.id} className="flex items-center gap-4 px-4 py-3 text-sm">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white/80 truncate">{r.user.name ?? "—"}</p>
+                      <p className="text-white/40 text-xs truncate">{r.course.title}</p>
+                    </div>
+                    {r.completedAt && (
+                      <span className="text-xs text-white/30 shrink-0">{new Date(r.completedAt).toLocaleDateString()}</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── COMPLETIONS REPORT TAB ────────────────────────────────────────── */}
+      {activeTab === "completions" && (
+        <div className="space-y-4">
+          <div className="flex flex-wrap gap-3 items-end">
+            <div className="space-y-1">
+              <p className="text-xs text-white/50">Course</p>
+              <select value={courseId} onChange={(e) => setCourseId(e.target.value)}
+                className="rounded-lg bg-white/5 border border-white/10 text-white/70 px-3 py-1.5 text-sm">
+                <option value="">All courses</option>
+                {courses.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
+              </select>
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs text-white/50">Status</p>
+              <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}
+                className="rounded-lg bg-white/5 border border-white/10 text-white/70 px-3 py-1.5 text-sm">
+                <option value="">All statuses</option>
+                <option value="PASSED">Passed</option>
+                <option value="FAILED">Failed</option>
+                <option value="IN_PROGRESS">In Progress</option>
+                <option value="NOT_STARTED">Not Started</option>
+              </select>
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs text-white/50">From</p>
+              <input type="date" value={filterStart} onChange={(e) => setFilterStart(e.target.value)}
+                className="rounded-lg bg-white/5 border border-white/10 text-white/70 px-3 py-1.5 text-sm" />
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs text-white/50">To</p>
+              <input type="date" value={filterEnd} onChange={(e) => setFilterEnd(e.target.value)}
+                className="rounded-lg bg-white/5 border border-white/10 text-white/70 px-3 py-1.5 text-sm" />
+            </div>
+            <Button onClick={exportCompletions} className="bg-[#cc3d00] text-white hover:bg-[#b33400] h-8 px-3">
+              <Download className="h-3.5 w-3.5 mr-1" /> Download CSV
+            </Button>
+          </div>
+          <p className="text-sm text-white/40">Use the filters above and click Download CSV to export filtered completion data.</p>
+        </div>
+      )}
+
+      {/* ── COURSE EFFECTIVENESS TAB ─────────────────────────────────────── */}
+      {activeTab === "effectiveness" && (
+        <div className="space-y-4">
+          <div className="flex gap-3 items-end">
+            <div className="space-y-1">
+              <p className="text-xs text-white/50">Filter by course</p>
+              <select value={courseId} onChange={(e) => { setCourseId(e.target.value); }}
+                className="rounded-lg bg-white/5 border border-white/10 text-white/70 px-3 py-1.5 text-sm">
+                <option value="">All courses</option>
+                {courses.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
+              </select>
+            </div>
+            <Button onClick={loadEffectiveness} variant="outline" className="border-white/10 text-white/60 hover:bg-white/10 h-8 px-3">
+              <RefreshCw className="h-3.5 w-3.5 mr-1" /> Load
+            </Button>
+          </div>
+
+          {loadingEff ? (
+            <div className="space-y-2">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-12 rounded-lg bg-white/5" />)}</div>
+          ) : (
+            <>
+              {effectiveness.length > 0 && (
+                <div className="rounded-xl border border-white/10 bg-white/5 p-4 mb-4">
+                  <h3 className="text-sm font-medium text-white/70 mb-4">Completion & Pass Rates</h3>
+                  <ResponsiveContainer width="100%" height={250}>
+                    <BarChart data={effectiveness.slice(0, 10)}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                      <XAxis dataKey="title" tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 9 }} interval={0} angle={-25} textAnchor="end" height={60} />
+                      <YAxis tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 11 }} unit="%" />
+                      <Tooltip contentStyle={{ background: "#0a1628", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#fff" }} />
+                      <Legend wrapperStyle={{ color: "rgba(255,255,255,0.5)", fontSize: 12 }} />
+                      <Bar dataKey="completionRate" name="Completion %" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="passRate" name="Pass %" fill="#22c55e" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+
+              <div className="rounded-xl border border-white/10 bg-white/5 overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-white/10 text-xs text-white/40">
+                      <th className="px-4 py-3 text-left">Course</th>
+                      <th className="px-4 py-3 text-right">Enrollments</th>
+                      <th className="px-4 py-3 text-right">Completion %</th>
+                      <th className="px-4 py-3 text-right">Pass %</th>
+                      <th className="px-4 py-3 text-right">Avg Score</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {effectiveness.map((r) => (
+                      <tr key={r.id} className="hover:bg-white/[0.03]">
+                        <td className="px-4 py-3 text-white/80">{r.title}</td>
+                        <td className="px-4 py-3 text-right text-white/60">{r.totalEnrollments}</td>
+                        <td className="px-4 py-3 text-right">
+                          <Badge className={`border-0 text-xs ${r.completionRate >= 80 ? "bg-green-900/40 text-green-300" : r.completionRate >= 50 ? "bg-yellow-900/40 text-yellow-300" : "bg-red-900/40 text-red-300"}`}>
+                            {r.completionRate}%
+                          </Badge>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <Badge className={`border-0 text-xs ${r.passRate >= 80 ? "bg-green-900/40 text-green-300" : r.passRate >= 50 ? "bg-yellow-900/40 text-yellow-300" : "bg-red-900/40 text-red-300"}`}>
+                            {r.passRate}%
+                          </Badge>
+                        </td>
+                        <td className="px-4 py-3 text-right text-white/60">{r.avgScore !== null ? `${r.avgScore}%` : "—"}</td>
+                      </tr>
+                    ))}
+                    {effectiveness.length === 0 && (
+                      <tr><td colSpan={5} className="px-4 py-8 text-center text-white/30 text-sm">No data. Click Load to fetch results.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}

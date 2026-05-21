@@ -30,7 +30,7 @@ type NavItem = {
 };
 
 const studentNav: NavItem[] = [
-  { label: "Dashboard",     href: "/dashboard",    icon: LayoutDashboard },
+  { label: "Dashboard",     href: "/",             icon: LayoutDashboard },
   { label: "My Courses",    href: "/my-courses",   icon: BookOpen },
   { label: "My Learning",   href: "/my-learning",  icon: GraduationCap },
   { label: "My Skills",     href: "/my-skills",    icon: TrendingUp },
@@ -54,6 +54,10 @@ const adminNav: NavItem[] = [
   { label: "Compliance",      href: "/admin/compliance",      icon: ShieldCheck },
   { label: "Reports",         href: "/admin/reports",         icon: BarChart3 },
   { label: "Settings",        href: "/admin/settings",        icon: Settings },
+];
+
+const managerNav: NavItem[] = [
+  { label: "Team Dashboard",  href: "/manager/dashboard",     icon: BarChart3 },
 ];
 
 // ── Component ──────────────────────────────────────────────────────────────
@@ -87,6 +91,15 @@ export function Sidebar() {
           Administration
         </p>
         {adminNav.map((item) => (
+          <NavLink key={item.href} item={item} active={pathname.startsWith(item.href)} />
+        ))}
+
+        <Separator className="my-3 bg-sidebar-border" />
+
+        <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-widest text-sidebar-foreground/50">
+          Manager
+        </p>
+        {managerNav.map((item) => (
           <NavLink key={item.href} item={item} active={pathname.startsWith(item.href)} />
         ))}
       </nav>

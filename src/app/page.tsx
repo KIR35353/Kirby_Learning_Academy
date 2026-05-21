@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { BookOpen, ShieldCheck, Award, TrendingUp, PlayCircle, CalendarDays, CheckCircle2, Clock } from "lucide-react";
+import { StudentProgressChart } from "@/components/charts/student-progress-chart";
 
 export default async function HomePage() {
   const session = await auth();
@@ -14,7 +15,7 @@ export default async function HomePage() {
   const displayName = session.user.name ?? session.user.email ?? "there";
 
   // Real enrollment stats
-  const [enrollments, dueSoonCount] = await Promise.all([
+  const [enrollments, dueSoonCount, completedAll, certCount] = await Promise.all([
     db.enrollment.findMany({
       where: { userId: session.user.id, tenantId: session.user.tenantId },
       include: {
@@ -31,6 +32,12 @@ export default async function HomePage() {
         dueDate: { lte: new Date(Date.now() + 7 * 86400000) },
       },
     }),
+    db.enrollment.findMany({
+      where: { userId: session.user.id, status: { in: ["PASSED", "COMPLETED"] }, completedAt: { not: null } },
+      select: { completedAt: true },
+      orderBy: { completedAt: "asc" },
+    }),
+    db.certificationRecord.count({ where: { userId: session.user.id, status: "VALID" } }),
   ]);
 
   const stats = {
@@ -39,6 +46,19 @@ export default async function HomePage() {
     passed: enrollments.filter((e) => e.status === "PASSED" || e.status === "COMPLETED").length,
     notStarted: enrollments.filter((e) => e.status === "NOT_STARTED").length,
   };
+
+  // Build 6-month completion history from all completions
+  const historyMap: Record<string, number> = {};
+  for (const e of completedAll) {
+    if (e.completedAt) {
+      const key = e.completedAt.toISOString().slice(0, 7);
+      historyMap[key] = (historyMap[key] ?? 0) + 1;
+    }
+  }
+  const completionHistory = Object.entries(historyMap)
+    .map(([month, count]) => ({ month, count }))
+    .sort((a, b) => a.month.localeCompare(b.month))
+    .slice(-6);
 
   const recentActive = enrollments
     .filter((e) => e.status === "IN_PROGRESS" || e.status === "NOT_STARTED")
@@ -84,6 +104,38 @@ export default async function HomePage() {
             <StatCard icon={Clock}       label="Not Started" value={String(stats.notStarted)} sub="ready to begin"                        accent="orange" />
             <StatCard icon={CheckCircle2} label="Passed"     value={String(stats.passed)}     sub="completed courses"                     accent="green" />
             <StatCard icon={TrendingUp}  label="Due Soon"    value={String(dueSoonCount)}     sub="in the next 7 days"                    accent={dueSoonCount > 0 ? "orange" : "blue"} />
+          </div>
+
+          {/* progress chart + certs row */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div className="md:col-span-2 rounded-xl border border-white/10 bg-white/5 p-4">
+              <p className="text-xs font-semibold uppercase tracking-widest text-white/50 mb-3">Completion History</p>
+              <StudentProgressChart data={completionHistory} />
+            </div>
+            <div className="rounded-xl border border-white/10 bg-white/5 p-4 flex flex-col gap-4">
+              <p className="text-xs font-semibold uppercase tracking-widest text-white/50">Quick Links</p>
+              <Link href="/compliance" className="flex items-center gap-3 rounded-lg bg-white/5 hover:bg-white/10 p-3 transition-colors">
+                <Award className="h-5 w-5 text-yellow-400 shrink-0" />
+                <div>
+                  <p className="text-sm text-white">{certCount} Valid Cert{certCount !== 1 ? "s" : ""}</p>
+                  <p className="text-xs text-white/40">View my compliance</p>
+                </div>
+              </Link>
+              <Link href="/my-skills" className="flex items-center gap-3 rounded-lg bg-white/5 hover:bg-white/10 p-3 transition-colors">
+                <TrendingUp className="h-5 w-5 text-blue-400 shrink-0" />
+                <div>
+                  <p className="text-sm text-white">Skills Matrix</p>
+                  <p className="text-xs text-white/40">View my competencies</p>
+                </div>
+              </Link>
+              <Link href="/catalog" className="flex items-center gap-3 rounded-lg bg-white/5 hover:bg-white/10 p-3 transition-colors">
+                <BookOpen className="h-5 w-5 text-green-400 shrink-0" />
+                <div>
+                  <p className="text-sm text-white">Course Catalog</p>
+                  <p className="text-xs text-white/40">Browse available courses</p>
+                </div>
+              </Link>
+            </div>
           </div>
 
           {/* active courses */}
