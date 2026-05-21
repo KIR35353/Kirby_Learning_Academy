@@ -1,5 +1,5 @@
 // Kirby Learning Academy — Prisma Schema
-// Phase 6: Learning Paths & Curricula
+// Phase 7: Standalone Assessments & Attestations
 // Run: npx prisma migrate dev --name phase6_learning_paths
 
 generator client {
@@ -31,6 +31,7 @@ model Tenant {
   enrollments  Enrollment[]
   learningPaths LearningPath[]
   curricula    Curriculum[]
+  assessments  StandaloneAssessment[]
 
   @@map("tenants")
 }
@@ -74,6 +75,7 @@ model Department {
   businessUnit BusinessUnit? @relation(fields: [businessUnitId], references: [id])
   users                User[]
   curriculumAssignments CurriculumAssignment[]
+  assessmentAssignments AssessmentAssignment[]
 
   @@unique([tenantId, name])
   @@index([tenantId])
@@ -157,6 +159,10 @@ model User {
   assignedEnrollments   Enrollment[]           @relation("AssignedBy")
   curriculumAssignments CurriculumAssignment[] @relation("UserCurriculumAssignments")
   assignedCurricula     CurriculumAssignment[] @relation("CurriculumAssignedBy")
+  createdAssessments    StandaloneAssessment[] @relation("AssessmentCreator")
+  assessmentAttempts    AssessmentAttempt[]    @relation("UserAssessmentAttempts")
+  assessmentAssignments AssessmentAssignment[] @relation("UserAssessmentAssignments")
+  assignedAssessments   AssessmentAssignment[] @relation("AssessmentAssignedBy")
 
   @@index([tenantId])
   @@index([email])
@@ -307,6 +313,7 @@ model Course {
   languages          CourseLanguage[]
   enrollments        Enrollment[]
   learningPathCourses LearningPathCourse[]
+  remediationFor     StandaloneAssessment[]
 
   @@index([tenantId])
   @@index([status])
@@ -490,4 +497,152 @@ model CurriculumAssignment {
   @@index([departmentId])
   @@index([tenantId])
   @@map("curriculum_assignments")
+}
+
+// ── Standalone Assessments & Attestations ───────────────────────────────────
+
+enum AssessmentType {
+  QUIZ
+  ATTESTATION
+}
+
+enum QuestionType {
+  MULTIPLE_CHOICE
+  TRUE_FALSE
+  MULTI_SELECT
+  ATTESTATION
+}
+
+enum AssessmentStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum AttemptStatus {
+  IN_PROGRESS
+  PASSED
+  FAILED
+  ABANDONED
+}
+
+model StandaloneAssessment {
+  id                  String           @id @default(cuid())
+  tenantId            String
+  title               String
+  description         String?          @db.Text
+  type                AssessmentType   @default(QUIZ)
+  status              AssessmentStatus @default(DRAFT)
+  passingScore        Int              @default(80)  // percentage 0–100
+  maxAttempts         Int?             // null = unlimited
+  timeLimitMinutes    Int?             // null = no time limit
+  randomizeQuestions  Boolean          @default(false)
+  questionsPerAttempt Int?             // null = all questions
+  remediationCourseId String?          // on fail: recommend/auto-assign this course
+  createdById         String
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+
+  tenant            Tenant                 @relation(fields: [tenantId], references: [id])
+  createdBy         User                   @relation("AssessmentCreator", fields: [createdById], references: [id])
+  remediationCourse Course?                @relation(fields: [remediationCourseId], references: [id])
+  questions         Question[]
+  assignments       AssessmentAssignment[]
+  attempts          AssessmentAttempt[]
+
+  @@index([tenantId])
+  @@index([status])
+  @@map("standalone_assessments")
+}
+
+model Question {
+  id           String       @id @default(cuid())
+  assessmentId String
+  type         QuestionType
+  text         String       @db.Text  // question text or attestation statement
+  explanation  String?      @db.Text  // shown after answer reveal
+  points       Int          @default(1)
+  order        Int          @default(0)
+  tags         String[]     // for question bank tagging
+
+  assessmentRel StandaloneAssessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  options       QuestionOption[]
+  answers       AttemptAnswer[]
+
+  @@index([assessmentId])
+  @@map("questions")
+}
+
+model QuestionOption {
+  id         String  @id @default(cuid())
+  questionId String
+  text       String
+  isCorrect  Boolean @default(false)
+  order      Int     @default(0)
+
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@index([questionId])
+  @@map("question_options")
+}
+
+model AssessmentAssignment {
+  id           String    @id @default(cuid())
+  assessmentId String
+  tenantId     String
+  userId       String?
+  roleName     String?
+  departmentId String?
+  dueDate      DateTime?
+  assignedAt   DateTime  @default(now())
+  assignedById String?
+
+  assessment  StandaloneAssessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  user        User?                @relation("UserAssessmentAssignments", fields: [userId], references: [id])
+  assignedBy  User?                @relation("AssessmentAssignedBy", fields: [assignedById], references: [id])
+  department  Department?          @relation(fields: [departmentId], references: [id])
+
+  @@index([assessmentId])
+  @@index([userId])
+  @@map("assessment_assignments")
+}
+
+model AssessmentAttempt {
+  id           String        @id @default(cuid())
+  assessmentId String
+  userId       String
+  tenantId     String
+  status       AttemptStatus @default(IN_PROGRESS)
+  score        Float?        // percentage 0–100
+  passed       Boolean?
+  startedAt    DateTime      @default(now())
+  submittedAt  DateTime?
+  expiresAt    DateTime?     // set when timeLimitMinutes is configured
+
+  assessment StandaloneAssessment @relation(fields: [assessmentId], references: [id])
+  user       User                 @relation("UserAssessmentAttempts", fields: [userId], references: [id])
+  answers    AttemptAnswer[]
+
+  @@index([assessmentId])
+  @@index([userId])
+  @@index([tenantId])
+  @@map("assessment_attempts")
+}
+
+model AttemptAnswer {
+  id                String   @id @default(cuid())
+  attemptId         String
+  questionId        String
+  selectedOptionIds String[] // IDs of chosen QuestionOption(s)
+  acknowledged      Boolean  @default(false)  // for ATTESTATION type
+  isCorrect         Boolean?
+  pointsEarned      Float    @default(0)
+  createdAt         DateTime @default(now())
+
+  attempt  AssessmentAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  question Question          @relation(fields: [questionId], references: [id])
+
+  @@unique([attemptId, questionId])
+  @@index([attemptId])
+  @@map("attempt_answers")
 }

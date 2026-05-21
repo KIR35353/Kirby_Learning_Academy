@@ -32,6 +32,7 @@ const studentNav: NavItem[] = [
   { label: "Dashboard",     href: "/dashboard",    icon: LayoutDashboard },
   { label: "My Courses",    href: "/my-courses",   icon: BookOpen },
   { label: "My Learning",   href: "/my-learning",  icon: GraduationCap },
+  { label: "Assessments",   href: "/assessments",  icon: ClipboardList },
   { label: "Course Catalog",href: "/catalog",      icon: BookOpen },
   { label: "Certifications",href: "/certs",        icon: Award },
 ];
