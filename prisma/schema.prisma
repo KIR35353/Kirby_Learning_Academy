@@ -1,5 +1,5 @@
 // Kirby Learning Academy — Prisma Schema
-// Phase 8: Skills Matrix & Competency Tracking
+// Phase 9: Compliance & Certification
 
 generator client {
   provider = "prisma-client"
@@ -33,6 +33,9 @@ model Tenant {
   assessments  StandaloneAssessment[]
   skills        Skill[]
   skillCategories SkillCategory[]
+  certifications       Certification[]
+  complianceRequirements ComplianceRequirement[]
+  auditLogs            AuditLog[]
 
   @@map("tenants")
 }
@@ -167,6 +170,9 @@ model User {
   assignedAssessments   AssessmentAssignment[] @relation("AssessmentAssignedBy")
   userSkills            UserSkill[]            @relation("UserSkills")
   endorsedSkills        UserSkill[]            @relation("SkillEndorser")
+  certificationRecords  CertificationRecord[]  @relation("UserCertRecords")
+  issuedCertRecords     CertificationRecord[]  @relation("CertIssuedBy")
+  auditActions          AuditLog[]             @relation("AuditActor")
 
   @@index([tenantId])
   @@index([email])
@@ -319,6 +325,7 @@ model Course {
   learningPathCourses LearningPathCourse[]
   remediationFor     StandaloneAssessment[]
   courseSkills       CourseSkill[]
+  renewalFor         Certification[]        @relation("CertRenewalCourse")
 
   @@index([tenantId])
   @@index([status])
@@ -744,4 +751,166 @@ model RoleSkillRequirement {
   @@unique([jobTitleId, skillId])
   @@index([jobTitleId])
   @@map("role_skill_requirements")
+}
+
+// ── Compliance & Certification (Phase 9) ────────────────────────────────────
+
+enum CertFramework {
+  OSHA
+  USCG
+  EPA
+  ISM_CODE
+  STCW
+  DOT
+  INTERNAL
+}
+
+enum CertStatus {
+  PENDING
+  VALID
+  EXPIRING_SOON
+  EXPIRED
+  SUSPENDED
+}
+
+enum CertType {
+  INITIAL
+  RENEWAL
+  RECERTIFICATION
+}
+
+enum RequirementScope {
+  JOB_TITLE
+  DEPARTMENT
+  LOCATION
+  BUSINESS_UNIT
+}
+
+enum AuditAction {
+  CERT_ISSUED
+  CERT_RENEWED
+  CERT_EXPIRED
+  CERT_SUSPENDED
+  CERT_UPLOADED
+  CERT_REVOKED
+  REQUIREMENT_CREATED
+  REQUIREMENT_UPDATED
+  REQUIREMENT_DELETED
+}
+
+// Certification type definition (the template, not a user's record)
+model Certification {
+  id                String        @id @default(cuid())
+  tenantId          String
+  name              String
+  description       String?       @db.Text
+  framework         CertFramework @default(INTERNAL)
+  type              CertType      @default(INITIAL)
+  validityDays      Int?          // null = no expiry / evergreen
+  renewalWindowDays Int           @default(90) // days before expiry to flag EXPIRING_SOON
+  renewalCourseId   String?       // course auto-assigned on approaching renewal
+  isActive          Boolean       @default(true)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  tenant             Tenant                  @relation(fields: [tenantId], references: [id])
+  renewalCourse      Course?                 @relation("CertRenewalCourse", fields: [renewalCourseId], references: [id])
+  records            CertificationRecord[]
+  requirements       ComplianceRequirement[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@map("certifications")
+}
+
+// A user's instance of a certification
+model CertificationRecord {
+  id              String     @id @default(cuid())
+  certificationId String
+  userId          String
+  tenantId        String
+  status          CertStatus @default(PENDING)
+  issuedAt        DateTime?
+  expiresAt       DateTime?
+  renewedFromId   String?    // previous CertificationRecord.id
+  source          String     // "manual" | "course_completion" | "upload" | "attestation"
+  sourceId        String?    // enrollmentId or attemptId
+  documentUrl     String?    // uploaded cert document
+  notes           String?    @db.Text
+  issuedById      String?
+  ipAddress       String?    // for digital sign-off attestations
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  certification Certification       @relation(fields: [certificationId], references: [id])
+  user          User                @relation("UserCertRecords", fields: [userId], references: [id])
+  issuedBy      User?               @relation("CertIssuedBy", fields: [issuedById], references: [id])
+  history       CertificationHistory[]
+  renewedFrom   CertificationRecord?  @relation("CertRenewal", fields: [renewedFromId], references: [id])
+  renewals      CertificationRecord[] @relation("CertRenewal")
+
+  @@index([certificationId])
+  @@index([userId])
+  @@index([tenantId])
+  @@index([status])
+  @@index([expiresAt])
+  @@map("certification_records")
+}
+
+// Immutable audit trail for a cert record
+model CertificationHistory {
+  id          String      @id @default(cuid())
+  recordId    String
+  fromStatus  CertStatus?
+  toStatus    CertStatus
+  changedAt   DateTime    @default(now())
+  changedById String?
+  reason      String?
+  ipAddress   String?
+
+  record CertificationRecord @relation(fields: [recordId], references: [id], onDelete: Cascade)
+
+  @@index([recordId])
+  @@map("certification_history")
+}
+
+// Compliance rules: "job X must hold cert Y"
+model ComplianceRequirement {
+  id              String           @id @default(cuid())
+  tenantId        String
+  certificationId String
+  scope           RequirementScope
+  scopeId         String?          // jobTitleId | departmentId | locationId | businessUnitId
+  isActive        Boolean          @default(true)
+  createdAt       DateTime         @default(now())
+
+  tenant        Tenant        @relation(fields: [tenantId], references: [id])
+  certification Certification @relation(fields: [certificationId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([certificationId])
+  @@map("compliance_requirements")
+}
+
+// Platform-wide immutable audit log
+model AuditLog {
+  id         String      @id @default(cuid())
+  tenantId   String
+  action     AuditAction
+  actorId    String?     // userId of person performing action
+  targetId   String?     // userId being acted on
+  entityId   String?     // e.g. certificationRecordId
+  entityType String?     // "CertificationRecord" | "ComplianceRequirement"
+  meta       Json?       // arbitrary extra data
+  ipAddress  String?
+  createdAt  DateTime    @default(now())
+
+  tenant Tenant  @relation(fields: [tenantId], references: [id])
+  actor  User?   @relation("AuditActor", fields: [actorId], references: [id])
+
+  @@index([tenantId])
+  @@index([actorId])
+  @@index([targetId])
+  @@index([createdAt])
+  @@map("audit_logs")
 }

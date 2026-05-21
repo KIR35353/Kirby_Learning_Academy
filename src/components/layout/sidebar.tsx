@@ -36,7 +36,7 @@ const studentNav: NavItem[] = [
   { label: "My Skills",     href: "/my-skills",    icon: TrendingUp },
   { label: "Assessments",   href: "/assessments",  icon: ClipboardList },
   { label: "Course Catalog",href: "/catalog",      icon: BookOpen },
-  { label: "Certifications",href: "/certs",        icon: Award },
+  { label: "Certifications",href: "/compliance",   icon: Award },
 ];
 
 const adminNav: NavItem[] = [
@@ -50,6 +50,7 @@ const adminNav: NavItem[] = [
   { label: "Assessments",     href: "/admin/assessments",     icon: ClipboardList },
   { label: "Skills Library",  href: "/admin/skills",          icon: TrendingUp },
   { label: "Skills Matrix",   href: "/admin/skills/matrix",   icon: BarChart3 },
+  { label: "Certifications",  href: "/admin/certifications",  icon: Award },
   { label: "Compliance",      href: "/admin/compliance",      icon: ShieldCheck },
   { label: "Reports",         href: "/admin/reports",         icon: BarChart3 },
   { label: "Settings",        href: "/admin/settings",        icon: Settings },

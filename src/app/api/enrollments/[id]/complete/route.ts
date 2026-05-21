@@ -60,6 +60,52 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         create: { userId: session.user.id!, skillId: cs.skillId, level: cs.levelGrant, source: "course_completion", sourceId: id },
       });
     }
+
+    // Auto-issue or renew certifications that map this course as their renewalCourse
+    const linkedCerts = await db.certification.findMany({
+      where: { renewalCourseId: enrollment.courseId, tenantId: enrollment.tenantId, isActive: true },
+    });
+    for (const cert of linkedCerts) {
+      const issuedAt = new Date();
+      const expiresAt = cert.validityDays
+        ? new Date(issuedAt.getTime() + cert.validityDays * 86400000)
+        : null;
+
+      const existing = await db.certificationRecord.findFirst({
+        where: { certificationId: cert.id, userId: session.user.id! },
+        orderBy: { createdAt: "desc" },
+      });
+
+      const record = await db.certificationRecord.create({
+        data: {
+          certificationId: cert.id,
+          userId: session.user.id!,
+          tenantId: enrollment.tenantId,
+          status: "VALID",
+          issuedAt,
+          expiresAt,
+          source: "course_completion",
+          sourceId: id,
+          renewedFromId: existing?.id ?? null,
+        },
+      });
+
+      await db.certificationHistory.create({
+        data: { recordId: record.id, fromStatus: existing?.status ?? null, toStatus: "VALID", reason: "Course completion" },
+      });
+
+      await db.auditLog.create({
+        data: {
+          tenantId: enrollment.tenantId,
+          action: "CERT_ISSUED",
+          actorId: session.user.id,
+          targetId: session.user.id,
+          entityId: record.id,
+          entityType: "CertificationRecord",
+          meta: { certName: cert.name, via: "course_completion", enrollmentId: id },
+        },
+      });
+    }
   }
 
   return NextResponse.json(updated);
