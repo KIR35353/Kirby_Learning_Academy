@@ -1,5 +1,5 @@
 // Kirby Learning Academy — Prisma Schema
-// Phase 11: Automation & Notifications
+// Phase 12: Engagement & Social Learning
 
 generator client {
   provider = "prisma-client"
@@ -38,6 +38,9 @@ model Tenant {
   auditLogs            AuditLog[]
   notifications        Notification[]
   jobSchedules         JobSchedule[]
+  badges               Badge[]
+  digitalCertificates  DigitalCertificate[]
+  forumCategories      ForumCategory[]
 
   @@map("tenants")
 }
@@ -177,6 +180,13 @@ model User {
   auditActions          AuditLog[]             @relation("AuditActor")
   notifications         Notification[]         @relation("UserNotifications")
   notificationPrefs     NotificationPreference[]
+  userBadges            UserBadge[]
+  awardedBadges         UserBadge[]            @relation("BadgeAwarder")
+  digitalCertificates   DigitalCertificate[]
+  forumThreads          ForumThread[]          @relation("ForumThreadAuthor")
+  forumPosts            ForumPost[]            @relation("ForumPostAuthor")
+  courseRatings         CourseRating[]
+  leaderboardOpts       LeaderboardOptOut[]
 
   @@index([tenantId])
   @@index([email])
@@ -330,6 +340,8 @@ model Course {
   remediationFor     StandaloneAssessment[]
   courseSkills       CourseSkill[]
   renewalFor         Certification[]        @relation("CertRenewalCourse")
+  ratings            CourseRating[]
+  forumCategories    ForumCategory[]
 
   @@index([tenantId])
   @@index([status])
@@ -994,3 +1006,169 @@ model JobSchedule {
   @@index([tenantId])
   @@map("job_schedules")
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Phase 12 — Engagement & Social Learning
+// ══════════════════════════════════════════════════════════════════════════════
+
+enum BadgeTrigger {
+  COURSE_COMPLETED
+  PATH_COMPLETED
+  CURRICULUM_COMPLETED
+  ASSESSMENT_PASSED
+  TOP_SCORER
+  STREAK_7
+  STREAK_30
+  COMPLIANCE_CHAMPION
+  MANUAL
+}
+
+// ── Badge definition (template) ───────────────────────────────────────────────
+model Badge {
+  id           String       @id @default(cuid())
+  tenantId     String
+  name         String
+  description  String?
+  imageUrl     String?
+  trigger      BadgeTrigger
+  triggerValue String?      // e.g. courseId for COURSE_COMPLETED
+  points       Int          @default(10)
+  isActive     Boolean      @default(true)
+  createdAt    DateTime     @default(now())
+
+  tenant     Tenant      @relation(fields: [tenantId], references: [id])
+  userBadges UserBadge[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@map("badges")
+}
+
+// ── User award instance ───────────────────────────────────────────────────────
+model UserBadge {
+  id         String   @id @default(cuid())
+  userId     String
+  badgeId    String
+  awardedAt  DateTime @default(now())
+  awardedById String?  // null = system-awarded
+  reason     String?
+
+  user      User   @relation(fields: [userId], references: [id])
+  badge     Badge  @relation(fields: [badgeId], references: [id])
+  awardedBy User?  @relation("BadgeAwarder", fields: [awardedById], references: [id])
+
+  @@unique([userId, badgeId])
+  @@index([userId])
+  @@map("user_badges")
+}
+
+// ── Digital Certificate (generated PDF record) ────────────────────────────────
+model DigitalCertificate {
+  id            String    @id @default(cuid())
+  tenantId      String
+  userId        String
+  enrollmentId  String?   @unique
+  title         String
+  issuerName    String    @default("Kirby Learning Academy")
+  recipientName String
+  issuedAt      DateTime  @default(now())
+  expiresAt     DateTime?
+  verifyCode    String    @unique @default(cuid())
+  pdfUrl        String?
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([tenantId])
+  @@map("digital_certificates")
+}
+
+// ── Forum category (per-course or general) ────────────────────────────────────
+model ForumCategory {
+  id          String   @id @default(cuid())
+  tenantId    String
+  courseId    String?  // null = general community board
+  name        String
+  description String?
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  tenant  Tenant        @relation(fields: [tenantId], references: [id])
+  course  Course?       @relation(fields: [courseId], references: [id])
+  threads ForumThread[]
+
+  @@index([tenantId])
+  @@map("forum_categories")
+}
+
+// ── Forum thread ──────────────────────────────────────────────────────────────
+model ForumThread {
+  id         String   @id @default(cuid())
+  categoryId String
+  authorId   String
+  title      String
+  isPinned   Boolean  @default(false)
+  isLocked   Boolean  @default(false)
+  viewCount  Int      @default(0)
+  postCount  Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  category ForumCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  author   User          @relation("ForumThreadAuthor", fields: [authorId], references: [id])
+  posts    ForumPost[]
+
+  @@index([categoryId])
+  @@index([authorId])
+  @@map("forum_threads")
+}
+
+// ── Forum post ────────────────────────────────────────────────────────────────
+model ForumPost {
+  id        String    @id @default(cuid())
+  threadId  String
+  authorId  String
+  body      String    @db.Text
+  isEdited  Boolean   @default(false)
+  editedAt  DateTime?
+  createdAt DateTime  @default(now())
+
+  thread ForumThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  author User        @relation("ForumPostAuthor", fields: [authorId], references: [id])
+
+  @@index([threadId])
+  @@index([authorId])
+  @@map("forum_posts")
+}
+
+// ── Course rating ─────────────────────────────────────────────────────────────
+model CourseRating {
+  id        String   @id @default(cuid())
+  courseId  String
+  userId    String
+  rating    Int      // 1–5
+  comment   String?  @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  course Course @relation(fields: [courseId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@unique([courseId, userId])
+  @@index([courseId])
+  @@map("course_ratings")
+}
+
+// ── Leaderboard opt-out ───────────────────────────────────────────────────────
+model LeaderboardOptOut {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("leaderboard_opt_outs")
+}
+

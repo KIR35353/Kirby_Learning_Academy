@@ -17,6 +17,8 @@ import {
   Building,
   TrendingUp,
   Bell,
+  Trophy,
+  MessageSquare,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Separator } from "@/components/ui/separator";
@@ -38,6 +40,9 @@ const studentNav: NavItem[] = [
   { label: "Assessments",   href: "/assessments",  icon: ClipboardList },
   { label: "Course Catalog",href: "/catalog",      icon: BookOpen },
   { label: "Certifications",href: "/compliance",   icon: Award },
+  { label: "Achievements",  href: "/achievements", icon: Award },
+  { label: "Leaderboard",   href: "/leaderboard",  icon: Trophy },
+  { label: "Forums",        href: "/forums",       icon: MessageSquare },
 ];
 
 const adminNav: NavItem[] = [
@@ -54,6 +59,7 @@ const adminNav: NavItem[] = [
   { label: "Certifications",  href: "/admin/certifications",  icon: Award },
   { label: "Compliance",      href: "/admin/compliance",      icon: ShieldCheck },
   { label: "Reports",         href: "/admin/reports",         icon: BarChart3 },
+  { label: "Badges",          href: "/admin/badges",          icon: Award },
   { label: "Notifications",   href: "/admin/notifications",   icon: Bell },
   { label: "Settings",        href: "/admin/settings",        icon: Settings },
 ];
