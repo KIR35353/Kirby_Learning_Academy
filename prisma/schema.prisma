@@ -1,5 +1,5 @@
 // Kirby Learning Academy — Prisma Schema
-// Phase 9: Compliance & Certification
+// Phase 11: Automation & Notifications
 
 generator client {
   provider = "prisma-client"
@@ -36,6 +36,8 @@ model Tenant {
   certifications       Certification[]
   complianceRequirements ComplianceRequirement[]
   auditLogs            AuditLog[]
+  notifications        Notification[]
+  jobSchedules         JobSchedule[]
 
   @@map("tenants")
 }
@@ -173,6 +175,8 @@ model User {
   certificationRecords  CertificationRecord[]  @relation("UserCertRecords")
   issuedCertRecords     CertificationRecord[]  @relation("CertIssuedBy")
   auditActions          AuditLog[]             @relation("AuditActor")
+  notifications         Notification[]         @relation("UserNotifications")
+  notificationPrefs     NotificationPreference[]
 
   @@index([tenantId])
   @@index([email])
@@ -913,4 +917,80 @@ model AuditLog {
   @@index([targetId])
   @@index([createdAt])
   @@map("audit_logs")
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Phase 11 — Automation & Notifications
+// ══════════════════════════════════════════════════════════════════════════════
+
+enum NotificationType {
+  COURSE_ASSIGNED
+  COURSE_DUE_SOON
+  COURSE_OVERDUE
+  COURSE_COMPLETED
+  CERT_EXPIRING
+  CERT_EXPIRED
+  CERT_ISSUED
+  ASSESSMENT_ASSIGNED
+  ASSESSMENT_DUE
+  BROADCAST
+  SYSTEM
+}
+
+// ── In-app Notification ───────────────────────────────────────────────────────
+model Notification {
+  id         String           @id @default(cuid())
+  tenantId   String
+  userId     String
+  type       NotificationType
+  title      String
+  body       String           @db.Text
+  link       String?          // deeplink URL within the LMS
+  isRead     Boolean          @default(false)
+  readAt     DateTime?
+  meta       Json?            // arbitrary extra data (entityId, entityType, etc.)
+  createdAt  DateTime         @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  user   User   @relation("UserNotifications", fields: [userId], references: [id])
+
+  @@index([userId, isRead])
+  @@index([tenantId])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+// ── Notification Preferences ──────────────────────────────────────────────────
+model NotificationPreference {
+  id       String           @id @default(cuid())
+  userId   String
+  type     NotificationType
+  inApp    Boolean          @default(true)
+  email    Boolean          @default(true)
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, type])
+  @@map("notification_preferences")
+}
+
+// ── Job Schedule (recurring job definitions) ────────────────────────────────
+// Stores cron-managed recurring assignment rules (e.g. annual OSHA refresh)
+model JobSchedule {
+  id          String    @id @default(cuid())
+  tenantId    String
+  name        String
+  jobType     String    // "cert_expiry_scan" | "overdue_escalation" | "recurrent_assignment"
+  cronExpr    String    // cron expression e.g. "0 6 * * *"
+  payload     Json?
+  isActive    Boolean   @default(true)
+  lastRunAt   DateTime?
+  nextRunAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@map("job_schedules")
 }

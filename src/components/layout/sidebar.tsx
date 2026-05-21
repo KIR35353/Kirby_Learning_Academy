@@ -16,6 +16,7 @@ import {
   RefreshCw,
   Building,
   TrendingUp,
+  Bell,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Separator } from "@/components/ui/separator";
@@ -53,6 +54,7 @@ const adminNav: NavItem[] = [
   { label: "Certifications",  href: "/admin/certifications",  icon: Award },
   { label: "Compliance",      href: "/admin/compliance",      icon: ShieldCheck },
   { label: "Reports",         href: "/admin/reports",         icon: BarChart3 },
+  { label: "Notifications",   href: "/admin/notifications",   icon: Bell },
   { label: "Settings",        href: "/admin/settings",        icon: Settings },
 ];
 
