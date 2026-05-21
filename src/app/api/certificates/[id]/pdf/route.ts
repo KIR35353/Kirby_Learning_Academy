@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { renderToBuffer } from "@react-pdf/renderer";
-import { createElement } from "react";
+import { createElement, type ReactElement } from "react";
+import type { DocumentProps } from "@react-pdf/renderer";
 import { CertificatePDF } from "@/lib/certificate-pdf";
 import QRCode from "qrcode";
 
@@ -38,12 +39,12 @@ export async function GET(
     expiresAt: cert.expiresAt,
     verifyCode: cert.verifyCode,
     qrDataUrl,
-  });
+  }) as ReactElement<DocumentProps>;
 
   const buffer = await renderToBuffer(element);
 
   const filename = `certificate-${cert.verifyCode}.pdf`;
-  return new NextResponse(buffer, {
+  return new NextResponse(new Uint8Array(buffer), {
     headers: {
       "Content-Type": "application/pdf",
       "Content-Disposition": `attachment; filename="${filename}"`,

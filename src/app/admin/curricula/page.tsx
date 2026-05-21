@@ -49,7 +49,7 @@ export default async function CurriculaPage() {
         <TopNav pageTitle="Curricula" />
         <main className="flex-1 overflow-y-auto p-6 md:p-8">
           <CurriculaClient
-            initialCurricula={curricula}
+            initialCurricula={curricula.map((c) => ({ ...c, createdAt: c.createdAt.toISOString() }))}
             availablePaths={learningPaths}
             departments={departments}
           />

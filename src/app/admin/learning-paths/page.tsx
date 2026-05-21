@@ -39,7 +39,7 @@ export default async function LearningPathsPage() {
       <div className="flex flex-1 flex-col overflow-hidden">
         <TopNav pageTitle="Learning Paths" />
         <main className="flex-1 overflow-y-auto p-6 md:p-8">
-          <LearningPathsClient initialPaths={paths} availableCourses={courses} />
+          <LearningPathsClient initialPaths={paths.map((p) => ({ ...p, createdAt: p.createdAt.toISOString() }))} availableCourses={courses} />
         </main>
       </div>
     </div>

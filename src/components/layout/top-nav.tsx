@@ -181,11 +181,11 @@ export function TopNav({
               <p className="text-xs text-muted-foreground">{user.email}</p>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem asChild>
-              <Link href="/profile"><User className="mr-2 h-4 w-4" /> My Profile</Link>
+            <DropdownMenuItem className="cursor-pointer" onClick={() => window.location.href = "/profile"}>
+              <User className="mr-2 h-4 w-4" /> My Profile
             </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link href="/notifications/preferences"><Settings className="mr-2 h-4 w-4" /> Notification Settings</Link>
+            <DropdownMenuItem className="cursor-pointer" onClick={() => window.location.href = "/notifications/preferences"}>
+              <Settings className="mr-2 h-4 w-4" /> Notification Settings
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => signOut({ callbackUrl: "/login" })}

@@ -8,11 +8,13 @@
  */
 import { Worker } from "bullmq";
 import { PrismaClient } from "../src/generated/prisma/client.js";
+import { PrismaPg } from "@prisma/adapter-pg";
 import { Resend } from "resend";
 import type { NotificationJobData } from "../src/lib/queues.js";
 import { QUEUE_NOTIFICATIONS } from "../src/lib/queues.js";
 
-const prisma = new PrismaClient();
+const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
+const prisma = new PrismaClient({ adapter } as ConstructorParameters<typeof PrismaClient>[0]);
 const resend = new Resend(process.env.RESEND_API_KEY ?? "re_test_key");
 const FROM = process.env.EMAIL_FROM ?? "Kirby Learning Academy <noreply@kirbyacademy.com>";
 
@@ -30,7 +32,7 @@ const worker = new Worker<NotificationJobData>(
 
     // Check user preference
     const pref = await prisma.notificationPreference.findUnique({
-      where: { userId_type: { userId, type: type as Parameters<typeof prisma.notificationPreference.findUnique>[0]["where"]["userId_type"]["type"] } },
+      where: { userId_type: { userId, type: type as never } },
     });
 
     // Create in-app notification unless opted out

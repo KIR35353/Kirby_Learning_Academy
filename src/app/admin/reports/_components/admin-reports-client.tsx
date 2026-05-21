@@ -182,7 +182,7 @@ export function AdminReportsClient({
                 <h3 className="text-sm font-medium text-white/70 mb-4">Enrollment Status Distribution</h3>
                 <ResponsiveContainer width="100%" height={200}>
                   <PieChart>
-                    <Pie data={enrollPieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={75} label={({ name, percent }) => `${name.replace("_", " ")} ${Math.round(percent * 100)}%`} labelLine={false}>
+                    <Pie data={enrollPieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={75} label={({ name, percent }: { name?: string; percent?: number }) => `${(name ?? "").replace("_", " ")} ${Math.round((percent ?? 0) * 100)}%`} labelLine={false}>
                       {enrollPieData.map((entry, i) => (
                         <Cell key={entry.name} fill={STATUS_COLORS[entry.name] ?? PIE_COLORS[i % PIE_COLORS.length]} />
                       ))}
@@ -212,7 +212,7 @@ export function AdminReportsClient({
                   <h3 className="text-sm font-medium text-white/70 mb-4">Certification Status</h3>
                   <ResponsiveContainer width="100%" height={200}>
                     <PieChart>
-                      <Pie data={certPieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={75} label={({ name, percent }) => `${name.replace("_", " ")} ${Math.round(percent * 100)}%`} labelLine={false}>
+                      <Pie data={certPieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={75} label={({ name, percent }: { name?: string; percent?: number }) => `${(name ?? "").replace("_", " ")} ${Math.round((percent ?? 0) * 100)}%`} labelLine={false}>
                         {certPieData.map((entry, i) => (
                           <Cell key={entry.name} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                         ))}

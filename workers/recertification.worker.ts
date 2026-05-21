@@ -7,11 +7,13 @@
  */
 import { Worker, Queue } from "bullmq";
 import { PrismaClient } from "../src/generated/prisma/client.js";
+import { PrismaPg } from "@prisma/adapter-pg";
 import { QUEUE_CERT_EXPIRY, QUEUE_NOTIFICATIONS } from "../src/lib/queues.js";
 import type { NotificationJobData, CertExpiryScanJobData } from "../src/lib/queues.js";
 import { certExpiringEmail, certExpiredEmail } from "../src/lib/email.js";
 
-const prisma = new PrismaClient();
+const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
+const prisma = new PrismaClient({ adapter } as ConstructorParameters<typeof PrismaClient>[0]);
 const redisUrl = process.env.REDIS_URL ?? "redis://localhost:6379";
 const parsed = new URL(redisUrl);
 const connection = { host: parsed.hostname, port: parseInt(parsed.port || "6379", 10) };

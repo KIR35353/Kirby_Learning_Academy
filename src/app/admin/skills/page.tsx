@@ -18,7 +18,7 @@ export default async function SkillsPage() {
     db.skill.findMany({
       where: { tenantId: session.user.tenantId },
       include: {
-        category: { select: { id: true, name: true } },
+        category: { include: { _count: { select: { skills: true } } } },
         courseSkills: { include: { course: { select: { id: true, title: true } } } },
         roleRequirements: { include: { jobTitle: { select: { id: true, name: true } } } },
         _count: { select: { userSkills: true } },

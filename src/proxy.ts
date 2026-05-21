@@ -8,6 +8,8 @@ const publicRoutes = [
   "/forgot-password",
   "/reset-password",
   "/api/auth",
+  "/api/certificates/verify",  // public cert verification
+  "/api/health",               // load-balancer health check
 ];
 
 // Routes that require specific roles

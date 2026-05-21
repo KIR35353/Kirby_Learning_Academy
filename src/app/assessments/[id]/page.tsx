@@ -41,7 +41,7 @@ export default async function AssessmentPage({ params }: { params: Promise<{ id:
       <div className="flex flex-1 flex-col overflow-hidden">
         <TopNav pageTitle={assessment.title} />
         <main className="flex-1 overflow-y-auto p-6 md:p-8">
-          <AssessmentClient assessment={assessment} initialAttempts={attempts} />
+          <AssessmentClient assessment={assessment} initialAttempts={attempts.map((a) => ({ ...a, startedAt: a.startedAt.toISOString(), submittedAt: a.submittedAt?.toISOString() ?? null }))} />
         </main>
       </div>
     </div>
