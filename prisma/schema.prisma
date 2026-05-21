@@ -1,6 +1,6 @@
 // Kirby Learning Academy — Prisma Schema
-// Phase 2: Auth, RBAC, User Management, Org structure
-// Run: npx prisma migrate dev --name phase2_auth_users
+// Phase 3: Org hierarchy, BusinessUnit, HRIS sync support
+// Run: npx prisma migrate dev --name phase3_org_hierarchy
 
 generator client {
   provider = "prisma-client"
@@ -22,27 +22,57 @@ model Tenant {
   updatedAt   DateTime @updatedAt
 
   users       User[]
+  businessUnits BusinessUnit[]
   departments Department[]
   locations   Location[]
   jobTitles   JobTitle[]
+  hrisSyncLogs HrisSyncLog[]
 
   @@map("tenants")
 }
 
 // ── Org Structure ────────────────────────────────────────────────────────────
-model Department {
-  id        String   @id @default(cuid())
-  name      String
-  code      String?
-  tenantId  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+model BusinessUnit {
+  id          String   @id @default(cuid())
+  name        String
+  code        String?
+  tenantId    String
+  parentId    String?  // self-referential for nested business units
+  sortOrder   Int      @default(0)
+  hrisId      String?  // external HRIS system identifier
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  tenant    Tenant   @relation(fields: [tenantId], references: [id])
-  users     User[]
+  tenant      Tenant       @relation(fields: [tenantId], references: [id])
+  parent      BusinessUnit? @relation("BusinessUnitHierarchy", fields: [parentId], references: [id])
+  children    BusinessUnit[] @relation("BusinessUnitHierarchy")
+  departments Department[]
+  users       User[]
 
   @@unique([tenantId, name])
   @@index([tenantId])
+  @@index([parentId])
+  @@map("business_units")
+}
+
+model Department {
+  id             String   @id @default(cuid())
+  name           String
+  code           String?
+  tenantId       String
+  businessUnitId String?
+  sortOrder      Int      @default(0)
+  hrisId         String?  // external HRIS system identifier
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id])
+  businessUnit BusinessUnit? @relation(fields: [businessUnitId], references: [id])
+  users        User[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@index([businessUnitId])
   @@map("departments")
 }
 
@@ -103,6 +133,14 @@ model User {
   location      Location?   @relation(fields: [locationId], references: [id])
   jobTitleId    String?
   jobTitle      JobTitle?   @relation(fields: [jobTitleId], references: [id])
+  businessUnitId String?
+  businessUnit  BusinessUnit? @relation(fields: [businessUnitId], references: [id])
+
+  // HRIS sync fields
+  hrisId        String?   // identifier in the HRIS system
+  hrisSource    String?   // "workday" | "successfactors" | "csv"
+  lastHrisSyncAt DateTime?
+  terminatedAt  DateTime? // set on HRIS termination; triggers deactivation
 
   roles         UserRole[]
   sessions      Session[]
@@ -199,5 +237,26 @@ model PasswordResetToken {
 
   @@index([userId])
   @@map("password_reset_tokens")
+}
+
+// ── HRIS Sync Logs ───────────────────────────────────────────────────────────
+model HrisSyncLog {
+  id          String   @id @default(cuid())
+  tenantId    String
+  source      String   // "workday" | "successfactors" | "csv"
+  status      String   // "running" | "success" | "failed"
+  recordsIn   Int      @default(0)
+  created     Int      @default(0)
+  updated     Int      @default(0)
+  deactivated Int      @default(0)
+  errors      Json?    // array of error messages
+  startedAt   DateTime @default(now())
+  finishedAt  DateTime?
+
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@index([startedAt])
+  @@map("hris_sync_logs")
 }
 

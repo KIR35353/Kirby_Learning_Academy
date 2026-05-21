@@ -12,6 +12,9 @@ import {
   Settings,
   GraduationCap,
   Award,
+  Network,
+  RefreshCw,
+  Building,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Separator } from "@/components/ui/separator";
@@ -33,12 +36,15 @@ const studentNav: NavItem[] = [
 ];
 
 const adminNav: NavItem[] = [
-  { label: "Users",         href: "/admin/users",      icon: Users },
-  { label: "Courses",       href: "/admin/courses",    icon: BookOpen },
-  { label: "Compliance",    href: "/admin/compliance", icon: ShieldCheck },
-  { label: "Reports",       href: "/admin/reports",    icon: BarChart3 },
-  { label: "Assessments",   href: "/admin/assessments",icon: ClipboardList },
-  { label: "Settings",      href: "/admin/settings",   icon: Settings },
+  { label: "Users",         href: "/admin/users",       icon: Users },
+  { label: "Org Structure", href: "/admin/org",         icon: Network },
+  { label: "HRIS Sync",     href: "/admin/hris",        icon: RefreshCw },
+  { label: "Tenants",       href: "/admin/tenants",     icon: Building },
+  { label: "Courses",       href: "/admin/courses",     icon: BookOpen },
+  { label: "Compliance",    href: "/admin/compliance",  icon: ShieldCheck },
+  { label: "Reports",       href: "/admin/reports",     icon: BarChart3 },
+  { label: "Assessments",   href: "/admin/assessments", icon: ClipboardList },
+  { label: "Settings",      href: "/admin/settings",    icon: Settings },
 ];
 
 // ── Component ──────────────────────────────────────────────────────────────

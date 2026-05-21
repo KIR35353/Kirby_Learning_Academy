@@ -83,14 +83,18 @@ async function main() {
 
   // 5. Admin user
   const adminEmail = process.env.ADMIN_EMAIL ?? "admin@kirbycorp.com";
-  const adminPassword = process.env.ADMIN_PASSWORD ?? "ChangeMe123!";
+  const adminPassword = process.env.ADMIN_PASSWORD ?? "KLA.adm1n";
   const passwordHash = await bcrypt.hash(adminPassword, 12);
 
   const superAdminRole = await db.role.findUnique({ where: { name: "SUPER_ADMIN" } });
 
   const admin = await db.user.upsert({
     where: { email: adminEmail },
-    update: {},
+    update: {
+      // Always sync the password and keep the account active on re-seed
+      passwordHash,
+      isActive: true,
+    },
     create: {
       email: adminEmail,
       name: "KLA Administrator",
@@ -103,9 +107,18 @@ async function main() {
     },
   });
 
-  console.log(`✔  Admin user: ${admin.email}`);
+  // Ensure SUPER_ADMIN role is attached even if the user already existed
+  if (superAdminRole) {
+    await db.userRole.upsert({
+      where: { userId_roleId: { userId: admin.id, roleId: superAdminRole.id } },
+      update: {},
+      create: { userId: admin.id, roleId: superAdminRole.id },
+    });
+  }
+
+  console.log(`✔  Admin user: ${admin.email} (password synced)`);
   if (!process.env.ADMIN_PASSWORD) {
-    console.log(`    ⚠  Default password used. Set ADMIN_PASSWORD in .env to override.`);
+    console.log(`    ℹ  Using default password. Set ADMIN_PASSWORD in .env to override.`);
   }
 
   console.log("\n✅  Seed complete.");
