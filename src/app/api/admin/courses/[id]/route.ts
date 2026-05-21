@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import type { Session } from "next-auth";
 import { db } from "@/lib/db";
 import { indexCourse, deindexCourse } from "@/lib/meili";
 import { z } from "zod";
@@ -16,7 +17,7 @@ const updateSchema = z.object({
   tags: z.array(z.string()).optional(),
 });
 
-async function requireAdmin(session: Awaited<ReturnType<typeof auth>>) {
+function requireAdmin(session: Session | null): boolean {
   if (!session?.user) return false;
   const roles = session.user.roles ?? [];
   return roles.includes("SUPER_ADMIN") || roles.includes("TENANT_ADMIN") || roles.includes("INSTRUCTOR");

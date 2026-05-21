@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect, useCallback, useTransition } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Search, BookOpen, Clock, Users, Tag, Loader2 } from "lucide-react";
+import { Search, BookOpen, Clock, Users, Loader2, CheckCircle2, PlayCircle } from "lucide-react";
 import { useDebounce } from "@/lib/hooks/use-debounce";
 
 interface CourseHit {
@@ -17,6 +17,10 @@ interface CourseHit {
   thumbnailUrl: string | null;
   targetAudience: string | null;
   publishedAt: string | null;
+}
+
+interface EnrollmentMap {
+  [courseId: string]: { id: string; status: string };
 }
 
 interface CatalogResult {
@@ -40,11 +44,26 @@ const CATEGORIES = [
 ];
 
 export function CatalogClient() {
+  const router = useRouter();
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("All");
   const [result, setResult] = useState<CatalogResult | null>(null);
   const [loading, setLoading] = useState(true);
+  const [enrollments, setEnrollments] = useState<EnrollmentMap>({});
+  const [enrolling, setEnrolling] = useState<string | null>(null);
   const debouncedQuery = useDebounce(query, 300);
+
+  // Load current user's enrollments once
+  useEffect(() => {
+    fetch("/api/enrollments")
+      .then((r) => r.json())
+      .then((data: Array<{ id: string; courseId: string; status: string }>) => {
+        const map: EnrollmentMap = {};
+        for (const e of data) map[e.courseId] = { id: e.id, status: e.status };
+        setEnrollments(map);
+      })
+      .catch(() => {});
+  }, []);
 
   const fetchCourses = useCallback(async (q: string, cat: string) => {
     setLoading(true);
@@ -113,14 +132,59 @@ export function CatalogClient() {
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {result?.hits.map((course) => (
-          <CourseCard key={course.id} course={course} />
+          <CourseCard
+            key={course.id}
+            course={course}
+            enrollment={enrollments[course.id]}
+            enrolling={enrolling === course.id}
+            onEnroll={async () => {
+              setEnrolling(course.id);
+              try {
+                const res = await fetch("/api/enrollments", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ courseId: course.id }),
+                });
+                if (res.ok) {
+                  const e = await res.json();
+                  setEnrollments((prev) => ({ ...prev, [course.id]: { id: e.id, status: e.status } }));
+                }
+              } finally {
+                setEnrolling(null);
+              }
+            }}
+            onLaunch={(enrollmentId) => router.push(`/courses/${enrollmentId}/launch`)}
+          />
         ))}
       </div>
     </div>
   );
 }
 
-function CourseCard({ course }: { course: CourseHit }) {
+function CourseCard({
+  course,
+  enrollment,
+  enrolling,
+  onEnroll,
+  onLaunch,
+}: {
+  course: CourseHit;
+  enrollment?: { id: string; status: string };
+  enrolling: boolean;
+  onEnroll: () => void;
+  onLaunch: (id: string) => void;
+}) {
+  const statusBadge = enrollment
+    ? {
+        PASSED: { label: "Passed", className: "bg-emerald-900/60 text-emerald-300" },
+        FAILED: { label: "Failed", className: "bg-red-900/40 text-red-400" },
+        IN_PROGRESS: { label: "In Progress", className: "bg-amber-900/60 text-amber-300" },
+        NOT_STARTED: { label: "Enrolled", className: "bg-blue-900/60 text-blue-300" },
+        COMPLETED: { label: "Completed", className: "bg-emerald-900/60 text-emerald-300" },
+        EXPIRED: { label: "Expired", className: "bg-zinc-700 text-zinc-300" },
+      }[enrollment.status]
+    : null;
+
   return (
     <div className="group flex flex-col rounded-xl border border-white/10 bg-white/5 overflow-hidden hover:border-white/20 transition-colors">
       {/* thumbnail */}
@@ -131,10 +195,20 @@ function CourseCard({ course }: { course: CourseHit }) {
         ) : (
           <BookOpen className="h-10 w-10 text-white/20" />
         )}
-        {course.category && (
-          <span className="absolute top-2 left-2 rounded-full bg-black/60 px-2 py-0.5 text-xs text-white/70">
-            {course.category}
-          </span>
+        <div className="absolute top-2 left-2 flex gap-1.5">
+          {course.category && (
+            <span className="rounded-full bg-black/60 px-2 py-0.5 text-xs text-white/70">
+              {course.category}
+            </span>
+          )}
+          {statusBadge && (
+            <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusBadge.className}`}>
+              {statusBadge.label}
+            </span>
+          )}
+        </div>
+        {enrollment?.status === "PASSED" && (
+          <CheckCircle2 className="absolute top-2 right-2 h-5 w-5 text-emerald-400" />
         )}
       </div>
 
@@ -170,12 +244,27 @@ function CourseCard({ course }: { course: CourseHit }) {
           </div>
         )}
 
-        <Button
-          size="sm"
-          className="mt-2 w-full bg-[#cc3d00]/80 text-white hover:bg-[#cc3d00] text-xs"
-        >
-          View Course
-        </Button>
+        {enrollment ? (
+          <Button
+            size="sm"
+            className="mt-2 w-full bg-[#cc3d00] text-white hover:bg-[#b33400] text-xs"
+            onClick={() => onLaunch(enrollment.id)}
+          >
+            <PlayCircle className="mr-1.5 h-3.5 w-3.5" />
+            {enrollment.status === "NOT_STARTED" ? "Start Course" :
+             enrollment.status === "IN_PROGRESS" ? "Resume" :
+             enrollment.status === "PASSED" ? "Review" : "Retake"}
+          </Button>
+        ) : (
+          <Button
+            size="sm"
+            disabled={enrolling}
+            className="mt-2 w-full bg-white/10 text-white hover:bg-white/20 text-xs"
+            onClick={onEnroll}
+          >
+            {enrolling ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Enroll"}
+          </Button>
+        )}
       </div>
     </div>
   );

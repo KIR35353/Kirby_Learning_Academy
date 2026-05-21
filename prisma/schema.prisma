@@ -1,6 +1,6 @@
 // Kirby Learning Academy — Prisma Schema
-// Phase 4: Course publishing, versions, catalog
-// Run: npx prisma migrate dev --name phase4_courses
+// Phase 5: Enrollment, learning delivery, completion tracking
+// Run: npx prisma migrate dev --name phase5_enrollments
 
 generator client {
   provider = "prisma-client"
@@ -28,6 +28,7 @@ model Tenant {
   jobTitles   JobTitle[]
   hrisSyncLogs HrisSyncLog[]
   courses     Course[]
+  enrollments Enrollment[]
 
   @@map("tenants")
 }
@@ -149,6 +150,8 @@ model User {
   passwordResets PasswordResetToken[]
   createdCourses Course[]        @relation("CourseCreator")
   uploadedVersions CourseVersion[] @relation("VersionUploader")
+  enrollments     Enrollment[]    @relation("EnrolledUser")
+  assignedEnrollments Enrollment[] @relation("AssignedBy")
 
   @@index([tenantId])
   @@index([email])
@@ -297,6 +300,7 @@ model Course {
   versions      CourseVersion[] @relation("CourseVersions")
   tags          CourseTag[]
   languages     CourseLanguage[]
+  enrollments   Enrollment[]
 
   @@index([tenantId])
   @@index([status])
@@ -315,9 +319,10 @@ model CourseVersion {
   uploadedById     String
   uploadedAt       DateTime @default(now())
 
-  course       Course   @relation("CourseVersions", fields: [courseId], references: [id], onDelete: Cascade)
-  uploadedBy   User     @relation("VersionUploader", fields: [uploadedById], references: [id])
-  activeFor    Course?  @relation("ActiveVersion")
+  course       Course       @relation("CourseVersions", fields: [courseId], references: [id], onDelete: Cascade)
+  uploadedBy   User         @relation("VersionUploader", fields: [uploadedById], references: [id])
+  activeFor    Course?      @relation("ActiveVersion")
+  enrollments  Enrollment[]
 
   @@unique([courseId, versionNumber])
   @@index([courseId])
@@ -346,5 +351,48 @@ model CourseLanguage {
 
   @@unique([courseId, language])
   @@map("course_languages")
+}
+
+// ── Enrollment & Learning Delivery ──────────────────────────────────────────
+
+enum EnrollmentStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  PASSED
+  FAILED
+  EXPIRED
+}
+
+model Enrollment {
+  id              String           @id @default(cuid())
+  userId          String
+  courseId        String
+  courseVersionId String?          // which version was active at enrollment
+  tenantId        String
+  status          EnrollmentStatus @default(NOT_STARTED)
+  dueDate         DateTime?
+  assignedById    String?          // null when self-enrolled
+  selfEnrolled    Boolean          @default(false)
+  startedAt       DateTime?        // first launch
+  completedAt     DateTime?        // when status reached PASSED/FAILED
+  score           Float?           // percentage 0–100
+  passed          Boolean?
+  attempts        Int              @default(0)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  user          User          @relation("EnrolledUser", fields: [userId], references: [id])
+  course        Course        @relation(fields: [courseId], references: [id])
+  courseVersion CourseVersion? @relation(fields: [courseVersionId], references: [id])
+  tenant        Tenant        @relation(fields: [tenantId], references: [id])
+  assignedBy    User?         @relation("AssignedBy", fields: [assignedById], references: [id])
+
+  @@unique([userId, courseId])   // one active enrollment per course per user
+  @@index([userId])
+  @@index([courseId])
+  @@index([tenantId])
+  @@index([status])
+  @@map("enrollments")
 }
 
