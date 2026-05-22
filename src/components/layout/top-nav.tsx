@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { signOut } from "next-auth/react";
+import { signOut, useSession } from "next-auth/react";
 import { Bell, ChevronDown, LogOut, User, Settings, CheckCheck, X } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -10,8 +10,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
@@ -30,19 +28,15 @@ interface NotifItem {
 // ── Props ──────────────────────────────────────────────────────────────────
 type TopNavProps = {
   pageTitle?: string;
-  user?: {
-    name: string;
-    email: string;
-    avatarUrl?: string;
-    initials: string;
-  };
 };
 
 // ── Component ──────────────────────────────────────────────────────────────
-export function TopNav({
-  pageTitle,
-  user = { name: "Demo User", email: "demo@kirbycorp.com", initials: "DU" },
-}: TopNavProps) {
+export function TopNav({ pageTitle }: TopNavProps) {
+  const { data: session } = useSession();
+  const userName  = session?.user?.name  ?? session?.user?.email ?? "User";
+  const userEmail = session?.user?.email ?? "";
+  const userImage = (session?.user as { image?: string } | undefined)?.image ?? undefined;
+  const initials  = userName.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2) || "??";
   const [unreadCount, setUnreadCount] = useState(0);
   const [notifications, setNotifications] = useState<NotifItem[]>([]);
   const [bellOpen, setBellOpen] = useState(false);
@@ -164,30 +158,31 @@ export function TopNav({
         <DropdownMenu>
           <DropdownMenuTrigger className="flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-accent">
             <Avatar className="h-7 w-7">
-              {user.avatarUrl && <AvatarImage src={user.avatarUrl} alt={user.name} />}
+              {userImage && <AvatarImage src={userImage} alt={userName} />}
               <AvatarFallback className="bg-k-navy text-[11px] font-bold text-white">
-                {user.initials}
+                {initials}
               </AvatarFallback>
             </Avatar>
             <span className="hidden max-w-36 truncate text-sm font-medium text-foreground sm:block">
-              {user.name}
+              {userName}
             </span>
             <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
           </DropdownMenuTrigger>
 
           <DropdownMenuContent align="end" className="w-52">
-            <DropdownMenuLabel className="font-normal">
-              <p className="font-semibold">{user.name}</p>
-              <p className="text-xs text-muted-foreground">{user.email}</p>
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
+            {/* User info header — plain div avoids MenuGroupContext crash */}
+            <div className="px-2 py-1.5 border-b border-border mb-1">
+              <p className="text-sm font-semibold truncate">{userName}</p>
+              <p className="text-xs text-muted-foreground truncate">{userEmail}</p>
+            </div>
             <DropdownMenuItem className="cursor-pointer" onClick={() => window.location.href = "/profile"}>
               <User className="mr-2 h-4 w-4" /> My Profile
             </DropdownMenuItem>
             <DropdownMenuItem className="cursor-pointer" onClick={() => window.location.href = "/notifications/preferences"}>
               <Settings className="mr-2 h-4 w-4" /> Notification Settings
             </DropdownMenuItem>
-            <DropdownMenuSeparator />
+            {/* Separator — plain div avoids MenuGroupContext crash */}
+            <div className="my-1 border-t border-border" />
             <DropdownMenuItem onClick={() => signOut({ callbackUrl: "/login" })}
               className="text-destructive focus:text-destructive cursor-pointer">
               <LogOut className="mr-2 h-4 w-4" /> Sign Out

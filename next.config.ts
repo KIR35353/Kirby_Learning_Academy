@@ -41,6 +41,9 @@ const nextConfig: NextConfig = {
 
   // Suppress noisy hydration warnings from development
   reactStrictMode: true,
+
+  // Hide the Next.js dev toolbar (N icon)
+  devIndicators: false,
 };
 
 // ── Sentry build-time config (disabled when no DSN is set) ───────────────────

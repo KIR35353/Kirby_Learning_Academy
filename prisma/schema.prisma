@@ -187,6 +187,7 @@ model User {
   forumPosts            ForumPost[]            @relation("ForumPostAuthor")
   courseRatings         CourseRating[]
   leaderboardOpts       LeaderboardOptOut[]
+  completionHistory     CourseCompletionHistory[]
 
   @@index([tenantId])
   @@index([email])
@@ -342,6 +343,7 @@ model Course {
   renewalFor         Certification[]        @relation("CertRenewalCourse")
   ratings            CourseRating[]
   forumCategories    ForumCategory[]
+  completionHistory  CourseCompletionHistory[]
 
   @@index([tenantId])
   @@index([status])
@@ -359,11 +361,16 @@ model CourseVersion {
   fileSizeBytes    Int?
   uploadedById     String
   uploadedAt       DateTime @default(now())
+  releaseDate      DateTime?          // from kla.release_date in manifest
+  revisionNotes    String?   @db.Text // from kla.revision_notes in manifest
+  forceRetake      Boolean   @default(false) // completions of older versions must retake
 
-  course       Course       @relation("CourseVersions", fields: [courseId], references: [id], onDelete: Cascade)
-  uploadedBy   User         @relation("VersionUploader", fields: [uploadedById], references: [id])
-  activeFor    Course?      @relation("ActiveVersion")
-  enrollments  Enrollment[]
+  course            Course       @relation("CourseVersions", fields: [courseId], references: [id], onDelete: Cascade)
+  uploadedBy        User         @relation("VersionUploader", fields: [uploadedById], references: [id])
+  activeFor         Course?      @relation("ActiveVersion")
+  enrollments       Enrollment[]
+  completionHistory CourseCompletionHistory[] @relation("CompletedInVersion")
+  retakeHistory     CourseCompletionHistory[] @relation("RetakeTriggeredBy")
 
   @@unique([courseId, versionNumber])
   @@index([courseId])
@@ -1170,5 +1177,35 @@ model LeaderboardOptOut {
   user User @relation(fields: [userId], references: [id])
 
   @@map("leaderboard_opt_outs")
+}
+
+// ── Course Completion History ─────────────────────────────────────────────────
+// Append-only audit table. When a new version with forceRetake=true is activated,
+// existing PASSED/FAILED enrollments are snapshotted here before being reset,
+// preserving a full audit trail of who completed which version.
+model CourseCompletionHistory {
+  id              String    @id @default(cuid())
+  userId          String
+  courseId        String
+  enrollmentId    String    // Enrollment.id at archive time (kept for audit; not FK)
+  courseVersionId String    // the CourseVersion the user completed
+  status          String    // EnrollmentStatus snapshot: "PASSED" | "FAILED" | "COMPLETED"
+  score           Float?    // percentage 0–100
+  passed          Boolean?
+  startedAt       DateTime?
+  completedAt     DateTime?
+  snapshotAt      DateTime  @default(now()) // when this record was archived
+  retakeVersionId String?   // CourseVersion.id that triggered the snapshot
+
+  user          User          @relation(fields: [userId], references: [id])
+  course        Course        @relation(fields: [courseId], references: [id])
+  courseVersion CourseVersion  @relation("CompletedInVersion", fields: [courseVersionId], references: [id])
+  retakeVersion CourseVersion? @relation("RetakeTriggeredBy", fields: [retakeVersionId], references: [id])
+
+  @@index([userId])
+  @@index([courseId])
+  @@index([courseVersionId])
+  @@index([enrollmentId])
+  @@map("course_completion_history")
 }
 

@@ -19,10 +19,10 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { CourseDialog } from "./course-dialog";
+import { ImportDialog } from "./import-dialog";
 import { UploadDialog } from "./upload-dialog";
 import type { CourseRow } from "./types";
 
@@ -41,8 +41,9 @@ export function CoursesClient({ initialCourses }: Props) {
   const [courses, setCourses] = useState<CourseRow[]>(initialCourses);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [createOpen, setCreateOpen] = useState(false);
-  const [editCourse, setEditCourse] = useState<CourseRow | null>(null);
+  const [importOpen, setImportOpen]   = useState(false);
+  const [createOpen, setCreateOpen]   = useState(false);
+  const [editCourse, setEditCourse]   = useState<CourseRow | null>(null);
   const [uploadCourse, setUploadCourse] = useState<CourseRow | null>(null);
   const [, startTransition] = useTransition();
 
@@ -105,14 +106,25 @@ export function CoursesClient({ initialCourses }: Props) {
           ))}
         </div>
 
-        <Button
-          size="sm"
-          className="ml-auto bg-[#cc3d00] text-white hover:bg-[#b33400]"
-          onClick={() => setCreateOpen(true)}
-        >
-          <Plus className="mr-1.5 h-4 w-4" />
-          New Course
-        </Button>
+        <div className="ml-auto flex gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            className="border-white/20 text-white/70 hover:bg-white/10 hover:text-white"
+            onClick={() => setCreateOpen(true)}
+          >
+            <Plus className="mr-1.5 h-4 w-4" />
+            Manual
+          </Button>
+          <Button
+            size="sm"
+            className="bg-[#cc3d00] text-white hover:bg-[#b33400]"
+            onClick={() => setImportOpen(true)}
+          >
+            <Upload className="mr-1.5 h-4 w-4" />
+            Import from ZIP
+          </Button>
+        </div>
       </div>
 
       {/* table */}
@@ -194,7 +206,7 @@ export function CoursesClient({ initialCourses }: Props) {
                             <Upload className="mr-2 h-3.5 w-3.5" />
                             Upload content
                           </DropdownMenuItem>
-                          <DropdownMenuSeparator className="bg-white/10" />
+                          <div className="my-1 h-px bg-white/10" />
                           {course.status === "DRAFT" && (
                             <DropdownMenuItem onClick={() => handleStatusChange(course, "REVIEW")}>
                               <Eye className="mr-2 h-3.5 w-3.5" />
@@ -236,6 +248,12 @@ export function CoursesClient({ initialCourses }: Props) {
       )}
 
       {/* dialogs */}
+      <ImportDialog
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        onImported={() => { setImportOpen(false); refresh(); }}
+      />
+
       <CourseDialog
         open={createOpen || !!editCourse}
         course={editCourse}

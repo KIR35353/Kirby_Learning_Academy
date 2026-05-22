@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useSession } from "next-auth/react";
 import {
   BookOpen,
   LayoutDashboard,
@@ -68,19 +69,26 @@ const managerNav: NavItem[] = [
   { label: "Team Dashboard",  href: "/manager/dashboard",     icon: BarChart3 },
 ];
 
+const ADMIN_ROLES = new Set(["SUPER_ADMIN", "TENANT_ADMIN"]);
+const MANAGER_ROLES = new Set(["SUPER_ADMIN", "TENANT_ADMIN", "MANAGER"]);
+
 // ── Component ──────────────────────────────────────────────────────────────
 export function Sidebar() {
   const pathname = usePathname();
+  const { data: session } = useSession();
+  const userRoles: string[] = (session?.user as { roles?: string[] } | undefined)?.roles ?? [];
+  const isAdmin   = userRoles.some((r) => ADMIN_ROLES.has(r));
+  const isManager = userRoles.some((r) => MANAGER_ROLES.has(r));
 
   return (
     <aside className="flex h-full w-60 flex-col bg-sidebar text-sidebar-foreground">
       {/* logo area */}
-      <div className="flex h-16 shrink-0 items-center border-b border-sidebar-border px-5">
+      <div className="flex shrink-0 items-center justify-center border-b border-sidebar-border px-4 py-5">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/kirby_learning_academy_logo.png"
           alt="Kirby Learning Academy"
-          className="h-9 w-auto object-contain"
+          className="w-full max-w-[200px] h-auto object-contain"
         />
       </div>
 
@@ -93,23 +101,29 @@ export function Sidebar() {
           <NavLink key={item.href} item={item} active={pathname === item.href} />
         ))}
 
-        <Separator className="my-3 bg-sidebar-border" />
+        {isAdmin && (
+          <>
+            <Separator className="my-3 bg-sidebar-border" />
+            <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-widest text-sidebar-foreground/50">
+              Administration
+            </p>
+            {adminNav.map((item) => (
+              <NavLink key={item.href} item={item} active={pathname.startsWith(item.href)} />
+            ))}
+          </>
+        )}
 
-        <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-widest text-sidebar-foreground/50">
-          Administration
-        </p>
-        {adminNav.map((item) => (
-          <NavLink key={item.href} item={item} active={pathname.startsWith(item.href)} />
-        ))}
-
-        <Separator className="my-3 bg-sidebar-border" />
-
-        <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-widest text-sidebar-foreground/50">
-          Manager
-        </p>
-        {managerNav.map((item) => (
-          <NavLink key={item.href} item={item} active={pathname.startsWith(item.href)} />
-        ))}
+        {isManager && (
+          <>
+            <Separator className="my-3 bg-sidebar-border" />
+            <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-widest text-sidebar-foreground/50">
+              Manager
+            </p>
+            {managerNav.map((item) => (
+              <NavLink key={item.href} item={item} active={pathname.startsWith(item.href)} />
+            ))}
+          </>
+        )}
       </nav>
 
       {/* bottom brand strip */}

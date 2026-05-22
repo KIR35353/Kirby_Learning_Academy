@@ -110,6 +110,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
 
   // ── Create DB record ────────────────────────────────────────────────────────
+  const forceRetakeRaw = formData.get("forceRetake");
+  const forceRetake = forceRetakeRaw === "true" || forceRetakeRaw === "1";
+
+  const meta = extractManifestMeta(manifest);
+
   const version = await db.courseVersion.create({
     data: {
       courseId,
@@ -119,12 +124,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       originalFileName: file.name ?? null,
       fileSizeBytes: zipBuffer.length,
       uploadedById: session.user.id,
+      releaseDate: meta.releaseDate ?? null,
+      revisionNotes: meta.revisionNotes ?? null,
+      forceRetake,
     },
   });
 
   // Auto-populate course metadata from manifest (only on first upload)
   if (versionNumber === 1) {
-    const meta = extractManifestMeta(manifest);
     await db.course.update({
       where: { id: courseId },
       data: {
@@ -164,16 +171,37 @@ function guessContentType(filename: string): string {
 }
 
 function extractManifestMeta(manifest: Record<string, unknown>) {
-  const title = typeof manifest.courseTitle === "string" ? manifest.courseTitle : undefined;
-  const duration =
-    typeof manifest.estimatedDuration === "number" ? manifest.estimatedDuration : undefined;
+  const course = manifest.course as Record<string, unknown> | undefined;
+  const intro  = manifest.intro  as Record<string, unknown> | undefined;
+  const kla    = manifest.kla    as Record<string, unknown> | undefined;
+
+  const title = (course?.title as string | undefined) ??
+    (typeof manifest.courseTitle === "string" ? manifest.courseTitle : undefined);
+
+  // Duration — parse "45-minute course" → 45
+  const durationBadge = intro?.duration_badge as string | undefined;
+  const durationParsed = durationBadge ? parseInt(durationBadge.match(/(\d+)/)?.[1] ?? "", 10) : NaN;
+  const duration = isNaN(durationParsed) ? undefined : durationParsed;
 
   const objectives: string[] = [];
-  if (Array.isArray(manifest.objectives)) {
-    for (const o of manifest.objectives) {
-      if (typeof o === "string") objectives.push(o);
+  if (Array.isArray(intro?.objectives)) {
+    for (const o of intro!.objectives as unknown[]) {
+      if (typeof o === "object" && o && "text" in o && typeof (o as Record<string, unknown>).text === "string") {
+        objectives.push((o as Record<string, unknown>).text as string);
+      }
     }
   }
 
-  return { title, duration, objectives };
+  const isTodo = (v: unknown): boolean =>
+    typeof v === "string" && (v.startsWith("TODO:") || v.trim() === "");
+
+  const releaseDate = !isTodo(kla?.release_date) && kla?.release_date
+    ? new Date(kla.release_date as string)
+    : undefined;
+
+  const revisionNotes = !isTodo(kla?.revision_notes)
+    ? (kla?.revision_notes as string | undefined)
+    : undefined;
+
+  return { title, duration, objectives, releaseDate, revisionNotes };
 }

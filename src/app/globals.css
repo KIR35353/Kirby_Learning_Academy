@@ -59,41 +59,41 @@
 }
 
 :root {
-  /* ── Kirby brand palette ─────────────────────────── */
-  --background:            oklch(1 0 0);
-  --foreground:            oklch(0.175 0.091 264.5);   /* k-navy for body text */
-  --card:                  oklch(1 0 0);
-  --card-foreground:       oklch(0.175 0.091 264.5);
-  --popover:               oklch(1 0 0);
-  --popover-foreground:    oklch(0.175 0.091 264.5);
-  --primary:               oklch(0.175 0.091 264.5);   /* k-navy  #002060 */
-  --primary-foreground:    oklch(1 0 0);
-  --secondary:             oklch(0.945 0.012 244);     /* light blue-gray */
-  --secondary-foreground:  oklch(0.175 0.091 264.5);
-  --muted:                 oklch(0.962 0.006 240);
-  --muted-foreground:      oklch(0.48 0.05 255);
-  --accent:                oklch(0.945 0.012 244);
-  --accent-foreground:     oklch(0.175 0.091 264.5);
-  --destructive:           oklch(0.577 0.245 27.325);
-  --border:                oklch(0.895 0.018 244);
-  --input:                 oklch(0.895 0.018 244);
-  --ring:                  oklch(0.451 0.136 249);     /* k-blue  #1d5fa8 */
-  /* chart palette pulled from Kirby brand */
-  --chart-1:               oklch(0.517 0.196 34.0);   /* k-orange  #cc3d00 */
-  --chart-2:               oklch(0.451 0.136 249);     /* k-blue    #1d5fa8 */
-  --chart-3:               oklch(0.566 0.108 242);     /* k-steel   #3d7fbd */
-  --chart-4:               oklch(0.278 0.081 260);     /* k-navy-mid #1a3a6e */
-  --chart-5:               oklch(0.614 0.171 45.0);   /* k-orange-lt #e06828 */
+  /* ── Kirby brand palette — dark navy theme ───────── */
+  --background:            #001a40;   /* deep navy main bg              */
+  --foreground:            #e8edf5;   /* off-white body text            */
+  --card:                  #002154;   /* slightly lighter navy cards    */
+  --card-foreground:       #e8edf5;
+  --popover:               #002a68;   /* dropdown / popover bg          */
+  --popover-foreground:    #e8edf5;
+  --primary:               #cc3d00;   /* k-orange                       */
+  --primary-foreground:    #ffffff;
+  --secondary:             #1a3a6e;   /* subtle navy tint               */
+  --secondary-foreground:  #e8edf5;
+  --muted:                 #002a68;
+  --muted-foreground:      #7a9abf;   /* dimmed text                    */
+  --accent:                #1a3a6e;   /* hover state bg                 */
+  --accent-foreground:     #e8edf5;
+  --destructive:           #dc2626;
+  --border:                #1e4080;   /* visible but subtle borders     */
+  --input:                 #002a68;   /* input field bg                 */
+  --ring:                  #1d5fa8;   /* k-blue                         */
+  /* chart palette */
+  --chart-1:               #cc3d00;   /* k-orange  */
+  --chart-2:               #1d5fa8;   /* k-blue    */
+  --chart-3:               #3d7fbd;   /* k-steel   */
+  --chart-4:               #1a3a6e;   /* k-navy-mid */
+  --chart-5:               #e06828;   /* k-orange-lt */
   --radius: 0.5rem;
-  /* ── Sidebar — navy chrome ───────────────────────── */
-  --sidebar:               oklch(0.155 0.079 265);     /* #001245 deep navy */
-  --sidebar-foreground:    oklch(0.92 0.012 240);
-  --sidebar-primary:       oklch(0.517 0.196 34.0);   /* k-orange */
-  --sidebar-primary-foreground: oklch(1 0 0);
-  --sidebar-accent:        oklch(0.23 0.075 264);      /* hover tint in nav */
-  --sidebar-accent-foreground: oklch(1 0 0);
-  --sidebar-border:        oklch(0.265 0.07 264);
-  --sidebar-ring:          oklch(0.451 0.136 249);
+  /* ── Sidebar — deeper navy chrome ───────────────── */
+  --sidebar:               #001030;   /* darker than main bg            */
+  --sidebar-foreground:    #e8edf5;
+  --sidebar-primary:       #cc3d00;   /* k-orange */
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent:        #002a68;   /* hover tint in nav              */
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border:        #1a3a6e;
+  --sidebar-ring:          #1d5fa8;
 }
 
 @layer base {

@@ -27,6 +27,7 @@ export function UploadDialog({ open, course, onClose, onUploaded }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<VersionResult | null>(null);
   const [autoPublish, setAutoPublish] = useState(false);
+  const [forceRetake, setForceRetake] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const dragRef = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState(false);
@@ -47,6 +48,7 @@ export function UploadDialog({ open, course, onClose, onUploaded }: Props) {
 
     const form = new FormData();
     form.append("file", file);
+    if (forceRetake) form.append("forceRetake", "true");
 
     try {
       // Use XHR for progress
@@ -98,6 +100,7 @@ export function UploadDialog({ open, course, onClose, onUploaded }: Props) {
     setError(null);
     setResult(null);
     setProgress(0);
+    setForceRetake(false);
     onClose();
   }
 
@@ -198,6 +201,20 @@ export function UploadDialog({ open, course, onClose, onUploaded }: Props) {
                 />
                 <label htmlFor="autopublish" className="text-sm text-white/70">
                   Publish immediately after upload
+                </label>
+              </div>
+
+              <div className="flex items-start gap-2 rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2.5">
+                <input
+                  id="forceretake"
+                  type="checkbox"
+                  checked={forceRetake}
+                  onChange={(e) => setForceRetake(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 accent-[#cc3d00] shrink-0"
+                />
+                <label htmlFor="forceretake" className="text-sm text-white/70 cursor-pointer">
+                  <span className="font-medium text-amber-300">Force retake</span> — existing completions
+                  will be archived and users must redo this course
                 </label>
               </div>
 

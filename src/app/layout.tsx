@@ -26,8 +26,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${inter.variable} h-full antialiased`}>
-      <body className="min-h-full bg-background text-foreground">
+    <html lang="en" className={`${inter.variable} h-full antialiased`} style={{ backgroundColor: '#001a40', color: '#e8edf5' }}>
+      <body className="min-h-full bg-background text-foreground" style={{ backgroundColor: '#001a40', color: '#e8edf5' }}>
         <SessionProvider>
           <TooltipProvider delay={300}>{children}</TooltipProvider>
         </SessionProvider>
