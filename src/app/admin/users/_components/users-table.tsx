@@ -6,9 +6,11 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { UserFormDialog } from "./user-form-dialog";
+import { ImportDialog } from "./import-dialog";
 import {
   Search,
   UserPlus,
+  Upload,
   MoreHorizontal,
   ShieldCheck,
   HardHat,
@@ -79,6 +81,7 @@ export function UsersTable({ departments, locations, jobTitles, allRoles }: Prop
   const [filterContractor, setFilterContractor] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [editUser, setEditUser] = useState<User | null>(null);
 
   const fetchUsers = useCallback(
@@ -133,13 +136,22 @@ export function UsersTable({ departments, locations, jobTitles, allRoles }: Prop
             {pagination.total} total user{pagination.total !== 1 ? "s" : ""}
           </p>
         </div>
-        <Button
-          onClick={() => setCreateOpen(true)}
-          className="bg-[#002060] text-white hover:bg-[#001245]"
-        >
-          <UserPlus className="mr-2 h-4 w-4" />
-          Add User
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setImportOpen(true)}
+          >
+            <Upload className="mr-2 h-4 w-4" />
+            Import CSV
+          </Button>
+          <Button
+            onClick={() => setCreateOpen(true)}
+            className="bg-[#002060] text-white hover:bg-[#001245]"
+          >
+            <UserPlus className="mr-2 h-4 w-4" />
+            Add User
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -344,6 +356,14 @@ export function UsersTable({ departments, locations, jobTitles, allRoles }: Prop
             fetchUsers(pagination.page);
             setEditUser(null);
           }}
+        />
+      )}
+
+      {/* Import dialog */}
+      {importOpen && (
+        <ImportDialog
+          onClose={() => setImportOpen(false)}
+          onComplete={() => { setImportOpen(false); fetchUsers(1); }}
         />
       )}
     </div>

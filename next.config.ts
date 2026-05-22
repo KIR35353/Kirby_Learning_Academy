@@ -2,6 +2,10 @@ import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
 
 // ── Security headers applied to every response ───────────────────────────────
+const isDev = process.env.NODE_ENV === "development";
+// In dev, MinIO runs at http://localhost:9000 (HTTP). In prod the S3/CDN is HTTPS.
+const localMinioOrigin = isDev ? "http://localhost:9000" : "";
+
 const securityHeaders = [
   { key: "X-DNS-Prefetch-Control", value: "on" },
   { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
@@ -15,10 +19,10 @@ const securityHeaders = [
       "default-src 'self'",
       "script-src 'self' 'unsafe-inline' 'unsafe-eval'",   // unsafe-eval needed for Next.js dev
       "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: blob: https:",
+      `img-src 'self' data: blob: https: ${localMinioOrigin}`.trim(),
       "font-src 'self' data:",
       "connect-src 'self' https://api.resend.com https://*.sentry.io",
-      "frame-src 'self'",                                  // CBT iframe: S3 URL added here in prod
+      `frame-src 'self' ${localMinioOrigin}`.trim(),       // CBT iframe: MinIO in dev, S3/CDN in prod
       "frame-ancestors 'self'",
       "base-uri 'self'",
       "form-action 'self'",

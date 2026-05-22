@@ -96,7 +96,6 @@ export function LaunchClient({ enrollmentId, courseId, courseTitle, launchUrl, c
           title={courseTitle}
           onLoad={() => setState((s) => (s === "loading" ? "running" : s))}
           onError={() => setState("error")}
-          sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
         />
 
         {/* Result overlay */}

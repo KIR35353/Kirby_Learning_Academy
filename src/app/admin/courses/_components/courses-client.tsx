@@ -208,10 +208,19 @@ export function CoursesClient({ initialCourses }: Props) {
                           </DropdownMenuItem>
                           <div className="my-1 h-px bg-white/10" />
                           {course.status === "DRAFT" && (
-                            <DropdownMenuItem onClick={() => handleStatusChange(course, "REVIEW")}>
-                              <Eye className="mr-2 h-3.5 w-3.5" />
-                              Submit for review
-                            </DropdownMenuItem>
+                            <>
+                              <DropdownMenuItem
+                                onClick={() => handleStatusChange(course, "PUBLISHED")}
+                                disabled={!course.activeVersion && course._count.versions === 0}
+                              >
+                                <CheckCircle2 className="mr-2 h-3.5 w-3.5 text-emerald-400" />
+                                Publish
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleStatusChange(course, "REVIEW")}>
+                                <Eye className="mr-2 h-3.5 w-3.5" />
+                                Submit for review
+                              </DropdownMenuItem>
+                            </>
                           )}
                           {course.status === "REVIEW" && (
                             <DropdownMenuItem

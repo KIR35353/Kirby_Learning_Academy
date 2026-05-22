@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import AdmZip from "adm-zip";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { uploadObject } from "@/lib/s3";
+import { uploadObject, getCourseBaseUrl } from "@/lib/s3";
 
 const MANIFEST_FILE = "_course_manifest.json";
 const ENTRY_FILE    = "CBT_Introduction.html";
@@ -134,6 +134,12 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // ── Detect thumbnail from zip ─────────────────────────────────────────────
+  const thumbnailRelativePath = detectThumbnail(entries, normalize, meta.thumbnailPath);
+  const thumbnailUrl = thumbnailRelativePath
+    ? getCourseBaseUrl(s3Prefix) + thumbnailRelativePath
+    : null;
+
   // ── Create CourseVersion and set as active ───────────────────────────────
   const version = await db.courseVersion.create({
     data: {
@@ -151,7 +157,7 @@ export async function POST(req: NextRequest) {
 
   await db.course.update({
     where: { id: course.id },
-    data:  { activeVersionId: version.id },
+    data:  { activeVersionId: version.id, ...(thumbnailUrl ? { thumbnailUrl } : {}) },
   });
 
   return NextResponse.json(
@@ -218,7 +224,58 @@ function extractManifestMeta(manifest: Record<string, unknown>) {
     ? (kla?.revision_notes as string | undefined)
     : undefined;
 
-  return { title, description, category, targetAudience, objectives, duration, tags, complianceTags, contractorVisible, releaseDate, revisionNotes };
+  // Thumbnail — manifest hint path (relative to zip root)
+  const thumbnailPath = !isTodo(kla?.thumbnail)
+    ? (kla?.thumbnail as string | undefined)
+    : !isTodo(kla?.cover_image)
+    ? (kla?.cover_image as string | undefined)
+    : undefined;
+
+  return { title, description, category, targetAudience, objectives, duration, tags, complianceTags, contractorVisible, releaseDate, revisionNotes, thumbnailPath };
+}
+
+const IMAGE_EXTS = new Set(["jpg", "jpeg", "png", "webp", "gif"]);
+const THUMBNAIL_NAMES = ["thumbnail", "cover", "preview", "hero", "banner"];
+
+/**
+ * Find the best thumbnail candidate in a zip.
+ * Priority: manifest hint → common name → first top-level image → any image.
+ */
+function detectThumbnail(
+  entries: AdmZip.IZipEntry[],
+  normalize: (name: string) => string,
+  manifestHint?: string,
+): string | null {
+  const imageFiles = entries
+    .filter((e) => !e.isDirectory)
+    .map((e) => normalize(e.entryName))
+    .filter((name) => IMAGE_EXTS.has(name.split(".").pop()?.toLowerCase() ?? ""));
+
+  if (imageFiles.length === 0) return null;
+
+  // 1. Manifest hint — exact or basename match
+  if (manifestHint) {
+    const hint = manifestHint.replace(/^\//, "");
+    if (imageFiles.includes(hint)) return hint;
+    const hintBase = hint.split("/").pop() ?? "";
+    const found = imageFiles.find((e) => e.split("/").pop() === hintBase);
+    if (found) return found;
+  }
+
+  // 2. Common thumbnail names (case-insensitive stem match)
+  for (const name of THUMBNAIL_NAMES) {
+    const found = imageFiles.find(
+      (e) => e.split("/").pop()?.split(".")[0]?.toLowerCase() === name,
+    );
+    if (found) return found;
+  }
+
+  // 3. First top-level image
+  const topLevel = imageFiles.find((e) => !e.includes("/"));
+  if (topLevel) return topLevel;
+
+  // 4. Any image at all
+  return imageFiles[0];
 }
 
 function guessContentType(filename: string): string {

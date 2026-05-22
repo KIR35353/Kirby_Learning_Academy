@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
       by: ["userId"],
       where: {
         tenantId: session.user.tenantId!,
-        status: "COMPLETED",
+        status: { in: ["PASSED", "COMPLETED"] },
         userId: { notIn: [...optOutIds] },
       },
       _count: { id: true },
