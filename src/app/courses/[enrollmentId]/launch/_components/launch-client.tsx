@@ -47,6 +47,9 @@ export function LaunchClient({ enrollmentId, courseId, courseTitle, launchUrl, c
           body: JSON.stringify({
             score: cbtScore ?? undefined,
             passed: cbtPassed ?? undefined,
+            totalSeconds: event.data.totalSeconds ?? undefined,
+            sections: event.data.sections ?? undefined,
+            questions: event.data.questions ?? undefined,
           }),
         });
       } catch {

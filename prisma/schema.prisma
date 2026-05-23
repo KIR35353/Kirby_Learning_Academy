@@ -435,6 +435,7 @@ model Enrollment {
   courseVersion CourseVersion? @relation(fields: [courseVersionId], references: [id])
   tenant        Tenant        @relation(fields: [tenantId], references: [id])
   assignedBy    User?         @relation("AssignedBy", fields: [assignedById], references: [id])
+  completionStats CourseCompletionStats?
 
   @@unique([userId, courseId])   // one active enrollment per course per user
   @@index([userId])
@@ -442,6 +443,27 @@ model Enrollment {
   @@index([tenantId])
   @@index([status])
   @@map("enrollments")
+}
+
+// ── Course Completion Stats ──────────────────────────────────────────────────
+// Stores the analytics payload received from the CBT via KLA_COMPLETE postMessage.
+// Created/updated by POST /api/enrollments/[id]/complete.
+model CourseCompletionStats {
+  id            String     @id @default(cuid())
+  enrollmentId  String     @unique
+  enrollment    Enrollment @relation(fields: [enrollmentId], references: [id])
+  userId        String
+  courseId      String
+  totalSeconds  Int?       // total time from session start to exam completion
+  sectionStats  Json?      // Array<{ id, views, timeSpentSeconds }>
+  questionStats Json?      // Array<{ id, stem, correct, timeSpentSeconds }>
+  rawPayload    Json       // full KLA_COMPLETE payload for future use
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  @@index([courseId])
+  @@index([userId])
+  @@map("course_completion_stats")
 }
 
 // ── Learning Paths & Curricula ───────────────────────────────────────────────

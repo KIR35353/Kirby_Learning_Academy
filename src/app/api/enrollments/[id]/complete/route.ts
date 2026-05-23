@@ -6,6 +6,19 @@ import { z } from "zod";
 const completeSchema = z.object({
   score: z.number().min(0).max(100).optional(),
   passed: z.boolean().optional(),
+  // Analytics fields from CBT KLA_COMPLETE postMessage
+  totalSeconds: z.number().int().nonnegative().nullable().optional(),
+  sections: z.array(z.object({
+    id: z.string(),
+    views: z.number().int().nonnegative(),
+    timeSpentSeconds: z.number().int().nonnegative(),
+  })).nullable().optional(),
+  questions: z.array(z.object({
+    id: z.string(),
+    stem: z.string(),
+    correct: z.boolean(),
+    timeSpentSeconds: z.number().int().nonnegative(),
+  })).nullable().optional(),
 });
 
 /**
@@ -34,7 +47,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const parsed = completeSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
-  const { score, passed } = parsed.data;
+  const { score, passed, totalSeconds, sections, questions } = parsed.data;
   const finalPassed = passed ?? (score !== undefined ? score >= 80 : true);
   const newStatus = finalPassed ? "PASSED" : "FAILED";
 
@@ -47,6 +60,28 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       completedAt: new Date(),
     },
   });
+
+  // Persist analytics stats (upsert so a retry doesn't create duplicates)
+  if (totalSeconds !== undefined || sections !== undefined || questions !== undefined) {
+    await db.courseCompletionStats.upsert({
+      where: { enrollmentId: id },
+      create: {
+        enrollmentId: id,
+        userId: session.user.id!,
+        courseId: enrollment.courseId,
+        totalSeconds: totalSeconds ?? null,
+        sectionStats: sections ?? null,
+        questionStats: questions ?? null,
+        rawPayload: body,
+      },
+      update: {
+        totalSeconds: totalSeconds ?? null,
+        sectionStats: sections ?? null,
+        questionStats: questions ?? null,
+        rawPayload: body,
+      },
+    });
+  }
 
   // Auto-grant skills mapped to this course on pass
   if (finalPassed) {
