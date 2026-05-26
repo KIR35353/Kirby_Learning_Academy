@@ -40,7 +40,7 @@ export function TopNav({ pageTitle }: TopNavProps) {
         email?: string | null;
       }
     | undefined;
-  const userName  = sessionUser?.displayName ?? sessionUser?.name ?? sessionUser?.email ?? "User";
+  const userName  = (sessionUser?.displayName || sessionUser?.name || sessionUser?.email || "User").trim() || "User";
   const userEmail = session?.user?.email ?? "";
   const userImage = (session?.user as { image?: string } | undefined)?.image ?? undefined;
   const initials  = userName.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2) || "??";

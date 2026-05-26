@@ -46,7 +46,7 @@ const credentialsProvider = Credentials({
       id: user.id,
       email: user.email,
       name: user.name ?? user.email,
-      displayName: user.displayName,
+      displayName: user.displayName || undefined,
       image: user.avatarUrl,
       tenantId: user.tenantId,
       isContractor: user.isContractor,
@@ -158,7 +158,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.tenantId = (user as { tenantId?: string }).tenantId;
         token.isContractor = (user as { isContractor?: boolean }).isContractor;
         token.roles = (user as { roles?: string[] }).roles ?? [];
-        token.displayName = (user as { displayName?: string | null }).displayName ?? undefined;
+        token.displayName = (user as { displayName?: string | null }).displayName || undefined;
+        token.name = (user as { name?: string }).name || undefined;
         // Fallback: if the user record somehow has no tenant, use the default
         if (!token.tenantId) {
           token.tenantId = (await getDefaultTenantId()) ?? undefined;
