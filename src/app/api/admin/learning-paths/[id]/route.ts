@@ -102,8 +102,20 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { id } = await params;
-  const existing = await db.learningPath.findFirst({ where: { id, tenantId: session.user.tenantId } });
+  const existing = await db.learningPath.findFirst({
+    where: { id, tenantId: session.user.tenantId },
+    include: { _count: { select: { curricula: true } } },
+  });
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  if (existing._count.curricula > 0) {
+    return NextResponse.json(
+      {
+        error: `Cannot delete learning path while it is used in ${existing._count.curricula} curriculum${existing._count.curricula > 1 ? "a" : ""}. Remove it from curricula first.`,
+      },
+      { status: 409 }
+    );
+  }
 
   await db.learningPath.delete({ where: { id } });
   return NextResponse.json({ ok: true });

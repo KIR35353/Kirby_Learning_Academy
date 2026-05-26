@@ -144,7 +144,13 @@ export function LearningPathsClient({ initialPaths, availableCourses }: Props) {
   async function deletePath(path: LearningPathRow) {
     if (!confirm(`Delete "${path.title}"? This cannot be undone.`)) return;
     const res = await fetch(`/api/admin/learning-paths/${path.id}`, { method: "DELETE" });
-    if (res.ok) setPaths((prev) => prev.filter((p) => p.id !== path.id));
+    if (res.ok) {
+      setPaths((prev) => prev.filter((p) => p.id !== path.id));
+      return;
+    }
+
+    const data = await res.json().catch(() => ({})) as { error?: string };
+    alert(data.error ?? "Failed to delete learning path");
   }
 
   const courseMap = new Map(availableCourses.map((c) => [c.id, c]));
