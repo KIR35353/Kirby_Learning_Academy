@@ -447,6 +447,10 @@ export function TenantDialog({ open, onOpenChange, editing, onSuccess }: Props) 
               <Input
                 value={newDeptInput}
                 onChange={(e) => setNewDeptInput(e.target.value)}
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="none"
+                spellCheck={false}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     e.preventDefault();
@@ -520,6 +524,10 @@ export function TenantDialog({ open, onOpenChange, editing, onSuccess }: Props) 
               <Input
                 value={newLocInput}
                 onChange={(e) => setNewLocInput(e.target.value)}
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="none"
+                spellCheck={false}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     e.preventDefault();
