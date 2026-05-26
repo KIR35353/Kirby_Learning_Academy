@@ -9,12 +9,12 @@ import { sendEmail, welcomeInviteEmail } from "@/lib/email";
 const createUserSchema = z.object({
   email: z.string().email(),
   name: z.string().min(1),
-  tenantId: z.string().optional(),
+  tenantId: z.string().nullable().optional(),
   isContractor: z.boolean().default(false),
-  departmentId: z.string().optional(),
-  locationId: z.string().optional(),
-  jobTitle: z.string().optional(),
-  hireDate: z.string().optional(),
+  departmentId: z.string().nullable().optional(),
+  locationId: z.string().nullable().optional(),
+  jobTitle: z.string().nullable().optional(),
+  hireDate: z.string().nullable().optional(),
   roleNames: z.array(z.string()).default(["STUDENT"]),
 });
 
