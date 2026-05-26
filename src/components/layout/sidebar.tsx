@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
@@ -75,10 +76,42 @@ const MANAGER_ROLES = new Set(["SUPER_ADMIN", "TENANT_ADMIN", "MANAGER"]);
 // ── Component ──────────────────────────────────────────────────────────────
 export function Sidebar() {
   const pathname = usePathname();
-  const { data: session } = useSession();
+  const { data: session, status, update } = useSession();
+  const sessionRefreshAttempted = useRef(false);
   const userRoles: string[] = (session?.user as { roles?: string[] } | undefined)?.roles ?? [];
   const isAdmin   = userRoles.some((r) => ADMIN_ROLES.has(r));
   const isManager = userRoles.some((r) => MANAGER_ROLES.has(r));
+
+  useEffect(() => {
+    if (status === "loading" || sessionRefreshAttempted.current) return;
+
+    const user = session?.user as
+      | {
+          roles?: string[];
+          displayName?: string | null;
+          name?: string | null;
+          email?: string | null;
+        }
+      | undefined;
+
+    // Server-action redirects can leave the client SessionProvider in an
+    // unauthenticated cache state until a manual reload. Trigger one refresh.
+    if (status === "unauthenticated") {
+      sessionRefreshAttempted.current = true;
+      void update();
+      return;
+    }
+
+    const needsRefresh =
+      !Array.isArray(user?.roles) ||
+      user.roles.length === 0 ||
+      (!user?.displayName && !user?.email && (!user?.name || user.name === "User"));
+
+    if (!needsRefresh) return;
+
+    sessionRefreshAttempted.current = true;
+    void update();
+  }, [session, status, update]);
 
   return (
     <aside className="flex h-full w-60 flex-col bg-sidebar text-sidebar-foreground">

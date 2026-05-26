@@ -81,6 +81,7 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const session = await auth();
   const branding = await getTenantBranding();
   const cssVars = branding ? buildCssVars(branding) : {};
 
@@ -118,7 +119,7 @@ export default async function RootLayout({
   });
 })();`}
         </Script>
-        <SessionProvider>
+        <SessionProvider session={session}>
           <TooltipProvider delay={300}>{children}</TooltipProvider>
         </SessionProvider>
       </body>
