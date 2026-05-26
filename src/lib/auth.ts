@@ -42,6 +42,9 @@ const credentialsProvider = Credentials({
     );
     if (!passwordMatch) return null;
 
+    const rolesArray = user.roles.map((ur: { role: { name: string } }) => ur.role.name);
+    console.log("[authorize]", { email: user.email, displayName: user.displayName, rolesCount: rolesArray.length });
+
     return {
       id: user.id,
       email: user.email,
@@ -50,7 +53,7 @@ const credentialsProvider = Credentials({
       image: user.avatarUrl,
       tenantId: user.tenantId,
       isContractor: user.isContractor,
-      roles: user.roles.map((ur: { role: { name: string } }) => ur.role.name),
+      roles: rolesArray,
     };
   },
 });
@@ -154,6 +157,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   callbacks: {
     async jwt({ token, user, account }) {
       if (user) {
+        console.log("[jwt:credentials]", { userId: user.id, displayName: (user as any).displayName, rolesCount: (user as any).roles?.length });
         token.id = user.id;
         token.tenantId = (user as { tenantId?: string }).tenantId;
         token.isContractor = (user as { isContractor?: boolean }).isContractor;
@@ -162,6 +166,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.roles = Array.isArray(userRoles) ? userRoles : [];
         token.displayName = (user as { displayName?: string | null }).displayName || undefined;
         token.name = (user as { name?: string }).name || undefined;
+        console.log("[jwt:token_after]", { displayName: token.displayName, rolesCount: (token.roles as any[])?.length });
         // Fallback: if the user record somehow has no tenant, use the default
         if (!token.tenantId) {
           token.tenantId = (await getDefaultTenantId()) ?? undefined;
@@ -205,6 +210,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return token;
     },
     async session({ session, token }) {
+      console.log("[session:input]", { displayName: token.displayName, rolesCount: (token.roles as any[])?.length });
       if (token && session.user) {
         session.user.id = token.id as string;
         const u = session.user as unknown as Record<string, unknown>;
@@ -213,6 +219,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         u.roles = token.roles;
         u.displayName = token.displayName;
       }
+      console.log("[session:output]", { displayName: (session.user as any)?.displayName, rolesCount: (session.user as any)?.roles?.length });
       return session;
     },
   },
