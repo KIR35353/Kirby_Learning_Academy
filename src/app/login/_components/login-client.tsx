@@ -3,7 +3,6 @@
 import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
-import Image from "next/image";
 import { loginWithCredentials } from "../actions";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -23,10 +22,15 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 
 interface Props {
   authMode: AuthMode;
+  branding: {
+    logoUrl: string | null;
+    loginBannerUrl: string | null;
+    appName: string | null;
+  };
 }
 
 // Inner component — isolated so the Suspense boundary catches useSearchParams
-function LoginForm({ authMode }: Props) {
+function LoginForm({ authMode, branding }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") ?? "/";
@@ -73,15 +77,24 @@ function LoginForm({ authMode }: Props) {
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#001245] px-4">
       <div className="w-full max-w-md">
+        {branding.loginBannerUrl && (
+          <div className="mb-5 overflow-hidden rounded-lg border border-white/10 shadow-xl">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={branding.loginBannerUrl}
+              alt="Login Banner"
+              className="h-28 w-full object-cover"
+            />
+          </div>
+        )}
+
         {/* Logo */}
         <div className="mb-8 flex justify-center">
-          <Image
-            src="/kirby_learning_academy_logo.png"
-            alt="Kirby Learning Academy"
-            width={240}
-            height={80}
-            className="object-contain"
-            priority
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={branding.logoUrl ?? "/kirby_learning_academy_logo.png"}
+            alt={branding.appName ?? "Kirby Learning Academy"}
+            className="h-auto w-full max-w-[240px] object-contain"
           />
         </div>
 
@@ -90,7 +103,7 @@ function LoginForm({ authMode }: Props) {
           <div className="mb-6 text-center">
             <h1 className="text-2xl font-semibold text-white">Sign In</h1>
             <p className="mt-1 text-sm text-white/60">
-              Welcome back to Kirby Learning Academy
+              Welcome back to {branding.appName ?? "Kirby Learning Academy"}
             </p>
           </div>
 
@@ -197,10 +210,10 @@ function LoginForm({ authMode }: Props) {
   );
 }
 
-export function LoginClient({ authMode }: Props) {
+export function LoginClient({ authMode, branding }: Props) {
   return (
     <Suspense>
-      <LoginForm authMode={authMode} />
+      <LoginForm authMode={authMode} branding={branding} />
     </Suspense>
   );
 }

@@ -30,6 +30,7 @@ const credentialsProvider = Credentials({
       where: { email: credentials.email as string },
       include: {
         roles: { include: { role: true } },
+        tenant: { select: { logoUrl: true } },
       },
     });
 
@@ -51,6 +52,7 @@ const credentialsProvider = Credentials({
       name: user.name ?? user.email,
        displayName: user.displayName || user.name || user.email,
       image: user.avatarUrl,
+      logoUrl: user.tenant?.logoUrl ?? null,
       tenantId: user.tenantId,
       isContractor: user.isContractor,
       roles: rolesArray,
@@ -160,6 +162,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         console.log("[jwt:credentials]", { userId: user.id, displayName: (user as any).displayName, rolesCount: (user as any).roles?.length });
         token.id = user.id;
         token.tenantId = (user as { tenantId?: string }).tenantId;
+        token.logoUrl = (user as { logoUrl?: string | null }).logoUrl ?? undefined;
         token.isContractor = (user as { isContractor?: boolean }).isContractor;
         // Ensure roles is always an array of strings
         const userRoles = (user as any).roles;
@@ -177,10 +180,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (account?.provider === "microsoft-entra-id" && token.sub) {
         const dbUser = await db.user.findUnique({
           where: { id: token.sub },
-          include: { roles: { include: { role: true } } },
+          include: {
+            roles: { include: { role: true } },
+            tenant: { select: { logoUrl: true } },
+          },
         });
         if (dbUser) {
           token.tenantId = dbUser.tenantId || ((await getDefaultTenantId()) ?? undefined);
+          token.logoUrl = dbUser.tenant?.logoUrl ?? undefined;
           token.isContractor = dbUser.isContractor;
           token.displayName = dbUser.displayName ?? undefined;
           token.name = dbUser.name ?? dbUser.email;
@@ -198,12 +205,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             displayName: true, 
             name: true, 
             email: true,
-            roles: { include: { role: true } }
+            roles: { include: { role: true } },
+            tenant: { select: { logoUrl: true } },
           },
         });
         if (dbUser) {
           token.displayName = dbUser.displayName ?? undefined;
           token.name = dbUser.name ?? dbUser.email;
+          token.logoUrl = dbUser.tenant?.logoUrl ?? undefined;
           token.roles = dbUser.roles.map((ur: { role: { name: string } }) => ur.role.name);
         }
       }
@@ -218,6 +227,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         u.isContractor = token.isContractor;
         u.roles = token.roles;
         u.displayName = token.displayName;
+        u.logoUrl = token.logoUrl;
       }
       console.log("[session:output]", { displayName: (session.user as any)?.displayName, rolesCount: (session.user as any)?.roles?.length });
       return session;

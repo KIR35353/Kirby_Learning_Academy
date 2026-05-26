@@ -9,6 +9,7 @@ declare module "next-auth" {
       name?: string | null;
       displayName?: string | null;
       image?: string | null;
+      logoUrl?: string | null;
       tenantId: string;
       roles: string[];
       isContractor: boolean;
@@ -23,5 +24,6 @@ declare module "next-auth/jwt" {
     roles?: string[];
     isContractor?: boolean;
     displayName?: string;
+    logoUrl?: string;
   }
 }

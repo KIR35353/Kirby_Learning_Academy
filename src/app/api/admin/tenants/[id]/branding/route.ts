@@ -74,6 +74,6 @@ export async function POST(req: NextRequest, { params }: Params) {
   const buffer = Buffer.from(await f.arrayBuffer());
   await uploadObject(key, buffer, f.type);
 
-  const url = getPublicFileUrl(key);
+  const url = `${getPublicFileUrl(key)}?v=${Date.now()}`;
   return NextResponse.json({ url });
 }

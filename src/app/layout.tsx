@@ -24,12 +24,15 @@ const getTenantBranding = cache(async () => {
   return db.tenant.findUnique({
     where: { id: tenantId },
     select: {
+      logoUrl: true,
+      loginBannerUrl: true,
       appName: true,
       faviconUrl: true,
       primaryColor: true,
       primaryForegroundColor: true,
       sidebarColor: true,
       accentColor: true,
+      updatedAt: true,
     },
   });
 });
@@ -38,13 +41,14 @@ const getTenantBranding = cache(async () => {
 export async function generateMetadata(): Promise<Metadata> {
   const branding = await getTenantBranding();
   const name = branding?.appName ?? "Kirby Learning Academy";
+  const iconUrl = branding?.faviconUrl
+    ? `${branding.faviconUrl}${branding.faviconUrl.includes("?") ? "&" : "?"}v=${branding.updatedAt.getTime()}`
+    : "/favicon.ico";
   return {
     title: { default: name, template: `%s | ${name}` },
     description:
       "Enterprise learning management system — compliance, certification, and workforce development.",
-    icons: branding?.faviconUrl
-      ? { icon: branding.faviconUrl }
-      : { icon: "/favicon.ico" },
+    icons: { icon: iconUrl },
   };
 }
 

@@ -78,6 +78,9 @@ export function Sidebar() {
   const pathname = usePathname();
   const { data: session, status, update } = useSession();
   const sessionRefreshAttempted = useRef(false);
+  const tenantLogo =
+    (session?.user as { logoUrl?: string | null } | undefined)?.logoUrl ??
+    "/kirby_learning_academy_logo.png";
   const userRoles: string[] = (session?.user as { roles?: string[] } | undefined)?.roles ?? [];
   const isAdmin   = userRoles.some((r) => ADMIN_ROLES.has(r));
   const isManager = userRoles.some((r) => MANAGER_ROLES.has(r));
@@ -119,7 +122,7 @@ export function Sidebar() {
       <div className="flex shrink-0 items-center justify-center border-b border-sidebar-border px-4 py-5">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src="/kirby_learning_academy_logo.png"
+          src={tenantLogo}
           alt="Kirby Learning Academy"
           className="w-full max-w-[200px] h-auto object-contain"
         />
