@@ -58,29 +58,32 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const body = await req.json();
+  const parsedMeta = updateSchema.safeParse(body);
+  if (!parsedMeta.success) return NextResponse.json({ error: parsedMeta.error.flatten() }, { status: 400 });
 
-  // Check if this is a courses update or a metadata update
-  if ("courses" in body) {
-    const parsed = coursesSchema.safeParse(body);
-    if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+  const parsedCourses = "courses" in body ? coursesSchema.safeParse(body) : null;
+  if (parsedCourses && !parsedCourses.success) {
+    return NextResponse.json({ error: parsedCourses.error.flatten() }, { status: 400 });
+  }
 
-    await db.$transaction([
-      db.learningPathCourse.deleteMany({ where: { learningPathId: id } }),
-      db.learningPathCourse.createMany({
-        data: parsed.data.courses.map((c, i) => ({
+  await db.$transaction(async (tx) => {
+    if (Object.keys(parsedMeta.data).length > 0) {
+      await tx.learningPath.update({ where: { id }, data: parsedMeta.data });
+    }
+
+    if (parsedCourses?.success) {
+      await tx.learningPathCourse.deleteMany({ where: { learningPathId: id } });
+      await tx.learningPathCourse.createMany({
+        data: parsedCourses.data.courses.map((c, i) => ({
           learningPathId: id,
           courseId: c.courseId,
           order: i,
           isRequired: c.isRequired,
           prerequisiteCourseId: c.prerequisiteCourseId ?? null,
         })),
-      }),
-    ]);
-  } else {
-    const parsed = updateSchema.safeParse(body);
-    if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
-    await db.learningPath.update({ where: { id }, data: parsed.data });
-  }
+      });
+    }
+  });
 
   const updated = await db.learningPath.findUnique({
     where: { id },
