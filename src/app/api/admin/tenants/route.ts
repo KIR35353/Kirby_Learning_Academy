@@ -30,8 +30,8 @@ export async function GET() {
 const createSchema = z.object({
   name: z.string().min(1).max(100),
   slug: z.string().min(1).max(50).regex(/^[a-z0-9-]+$/, "Slug must be lowercase letters, numbers, and hyphens only"),
-  domain: z.string().regex(/^[a-z0-9][a-z0-9.-]*\.[a-z]{2,}$/, "Invalid domain format").optional(),
-  logoUrl: z.string().url().optional(),
+  domain: z.string().regex(/^[a-z0-9][a-z0-9.-]*\.[a-z]{2,}$/, "Invalid domain format").nullable().optional(),
+  logoUrl: z.string().url().nullable().optional(),
   departments: z.array(z.string().min(1)).optional(),
   locations: z.array(z.string().min(1)).optional(),
 });

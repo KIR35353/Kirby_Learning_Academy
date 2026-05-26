@@ -90,6 +90,32 @@ const editSchema = z.object({
 type CreateValues = z.infer<typeof createSchema>;
 type EditValues = z.infer<typeof editSchema>;
 
+function getApiErrorMessage(payload: unknown): string {
+  if (!payload || typeof payload !== "object") return "Request failed";
+
+  const data = payload as {
+    error?: unknown;
+    message?: unknown;
+  };
+
+  if (typeof data.error === "string" && data.error.trim()) return data.error;
+  if (typeof data.message === "string" && data.message.trim()) return data.message;
+
+  if (data.error && typeof data.error === "object") {
+    const err = data.error as {
+      fieldErrors?: Record<string, string[] | undefined>;
+      formErrors?: string[];
+    };
+    const messages = [
+      ...(err.formErrors ?? []),
+      ...(Object.values(err.fieldErrors ?? {}).flat().filter(Boolean) as string[]),
+    ];
+    if (messages.length > 0) return messages.join("\n");
+  }
+
+  return "Request failed";
+}
+
 interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -321,7 +347,8 @@ export function TenantDialog({ open, onOpenChange, editing, onSuccess }: Props) 
       }),
     });
     if (!res.ok) {
-      setServerError(((await res.json()) as { error?: string }).error ?? "Failed to create tenant");
+      const data = await res.json().catch(() => ({}));
+      setServerError(getApiErrorMessage(data));
       return;
     }
     onSuccess();
@@ -349,7 +376,8 @@ export function TenantDialog({ open, onOpenChange, editing, onSuccess }: Props) 
       }),
     });
     if (!res.ok) {
-      setServerError(((await res.json()) as { error?: string }).error ?? "Failed to update tenant");
+      const data = await res.json().catch(() => ({}));
+      setServerError(getApiErrorMessage(data));
       return;
     }
     onSuccess();
