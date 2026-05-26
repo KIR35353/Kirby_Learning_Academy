@@ -25,9 +25,16 @@ const credentialsProvider = Credentials({
   },
   async authorize(credentials) {
     if (!credentials?.email || !credentials?.password) return null;
+    const normalizedEmail = String(credentials.email).trim();
+    if (!normalizedEmail) return null;
 
-    const user = await db.user.findUnique({
-      where: { email: credentials.email as string },
+    const user = await db.user.findFirst({
+      where: {
+        email: {
+          equals: normalizedEmail,
+          mode: "insensitive",
+        },
+      },
       include: {
         roles: { include: { role: true } },
         tenant: { select: { logoUrl: true, appName: true, supportEmail: true } },
