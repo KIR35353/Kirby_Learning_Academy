@@ -60,6 +60,34 @@ const createSchema = z.object({
 
 type FormValues = z.infer<typeof createSchema>;
 
+function getApiErrorMessage(payload: unknown): string {
+  if (!payload || typeof payload !== "object") return "An error occurred";
+
+  const data = payload as {
+    error?: unknown;
+    message?: unknown;
+  };
+
+  if (typeof data.error === "string" && data.error.trim()) return data.error;
+  if (typeof data.message === "string" && data.message.trim()) return data.message;
+
+  if (data.error && typeof data.error === "object") {
+    const errObj = data.error as {
+      fieldErrors?: Record<string, string[] | undefined>;
+      formErrors?: string[];
+    };
+
+    const messages = [
+      ...(errObj.formErrors ?? []),
+      ...Object.values(errObj.fieldErrors ?? {}).flat().filter(Boolean) as string[],
+    ];
+
+    if (messages.length > 0) return messages.join("\n");
+  }
+
+  return "An error occurred";
+}
+
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -202,7 +230,7 @@ Please change your password after your first login.`
       }
     } else {
       const data = await res.json().catch(() => ({}));
-      alert((data as { error?: string }).error ?? "An error occurred");
+      alert(getApiErrorMessage(data));
     }
   }
 
