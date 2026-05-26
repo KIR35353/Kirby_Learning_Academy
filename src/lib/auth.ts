@@ -161,9 +161,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.id = user.id;
         token.tenantId = (user as { tenantId?: string }).tenantId;
         token.isContractor = (user as { isContractor?: boolean }).isContractor;
-        // Ensure roles is always an array, even if empty
-        const userRoles = (user as { roles?: string[] | Record<string, unknown>[] }).roles;
-        token.roles = Array.isArray(userRoles) ? userRoles : [];
+        // Ensure roles is always an array of strings
+        const userRoles = (user as any).roles;
+        token.roles = Array.isArray(userRoles) ? userRoles.filter((r: any) => typeof r === 'string') : [];
         token.displayName = (user as { displayName?: string | null }).displayName || undefined;
         token.name = (user as { name?: string }).name || undefined;
         console.log("[jwt:token_after]", { displayName: token.displayName, rolesCount: (token.roles as any[])?.length });
