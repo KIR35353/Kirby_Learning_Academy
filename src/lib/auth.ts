@@ -157,7 +157,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.id = user.id;
         token.tenantId = (user as { tenantId?: string }).tenantId;
         token.isContractor = (user as { isContractor?: boolean }).isContractor;
-        token.roles = (user as { roles?: string[] }).roles ?? [];
+        // Ensure roles is always an array, even if empty
+        const userRoles = (user as { roles?: string[] | Record<string, unknown>[] }).roles;
+        token.roles = Array.isArray(userRoles) ? userRoles : [];
         token.displayName = (user as { displayName?: string | null }).displayName || undefined;
         token.name = (user as { name?: string }).name || undefined;
         // Fallback: if the user record somehow has no tenant, use the default
@@ -183,15 +185,21 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         }
       }
 
-      // Backfill display name for existing sessions created before displayName was included in the token.
-      if (token.sub && (!token.displayName || token.name === "User")) {
+      // Backfill display name and roles for existing sessions created before displayName/roles were included in token
+      if (token.sub && (!token.displayName || !token.roles || token.roles.length === 0 || token.name === "User")) {
         const dbUser = await db.user.findUnique({
           where: { id: token.sub },
-          select: { displayName: true, name: true, email: true },
+          select: { 
+            displayName: true, 
+            name: true, 
+            email: true,
+            roles: { include: { role: true } }
+          },
         });
         if (dbUser) {
           token.displayName = dbUser.displayName ?? undefined;
           token.name = dbUser.name ?? dbUser.email;
+          token.roles = dbUser.roles.map((ur: { role: { name: string } }) => ur.role.name);
         }
       }
       return token;
