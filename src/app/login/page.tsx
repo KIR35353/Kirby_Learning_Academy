@@ -9,6 +9,7 @@ type LoginBranding = {
   logoUrl: string | null;
   faviconUrl: string | null;
   loginBannerUrl: string | null;
+  supportEmail: string | null;
   updatedAt: Date;
 };
 
@@ -30,15 +31,15 @@ async function getLoginBranding(): Promise<LoginBranding | null> {
           logoUrl: true,
           faviconUrl: true,
           loginBannerUrl: true,
+          supportEmail: true,
           updatedAt: true,
         },
       })
     : null;
   if (byHost) return byHost;
 
-  const tenantCount = await db.tenant.count();
-  if (tenantCount !== 1) return null;
-
+  // Fall back to the first (or only) tenant — works for single-tenant installs
+  // and for multi-tenant installs where no subdomain/domain match is found.
   return db.tenant.findFirst({
     orderBy: { createdAt: "asc" },
     select: {
@@ -46,6 +47,7 @@ async function getLoginBranding(): Promise<LoginBranding | null> {
       logoUrl: true,
       faviconUrl: true,
       loginBannerUrl: true,
+      supportEmail: true,
       updatedAt: true,
     },
   });
@@ -76,6 +78,7 @@ export default async function LoginPage() {
         logoUrl: branding?.logoUrl ?? null,
         loginBannerUrl: branding?.loginBannerUrl ?? null,
         appName: branding?.appName ?? null,
+        supportEmail: branding?.supportEmail ?? null,
       }}
     />
   );

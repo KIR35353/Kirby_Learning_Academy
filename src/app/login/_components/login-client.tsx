@@ -26,6 +26,7 @@ interface Props {
     logoUrl: string | null;
     loginBannerUrl: string | null;
     appName: string | null;
+    supportEmail: string | null;
   };
 }
 
@@ -202,8 +203,19 @@ function LoginForm({ authMode, branding }: Props) {
           )}
         </div>
 
-        <p className="mt-6 text-center text-xs text-white/30">
-          © {new Date().getFullYear()} Kirby Corporation. All rights reserved.
+        {branding.supportEmail && (
+          <p className="mt-4 text-center text-xs text-white/40">
+            Need help?{" "}
+            <a
+              href={`mailto:${branding.supportEmail}`}
+              className="underline underline-offset-2 hover:text-white/60 transition-colors"
+            >
+              {branding.supportEmail}
+            </a>
+          </p>
+        )}
+        <p className="mt-3 text-center text-xs text-white/30">
+          © {new Date().getFullYear()} {branding.appName ?? "Kirby Corporation"}. All rights reserved.
         </p>
       </div>
     </div>
