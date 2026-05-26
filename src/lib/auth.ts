@@ -49,7 +49,7 @@ const credentialsProvider = Credentials({
       id: user.id,
       email: user.email,
       name: user.name ?? user.email,
-      displayName: user.displayName || undefined,
+       displayName: user.displayName || user.name || user.email,
       image: user.avatarUrl,
       tenantId: user.tenantId,
       isContractor: user.isContractor,
@@ -164,8 +164,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         // Ensure roles is always an array of strings
         const userRoles = (user as any).roles;
         token.roles = Array.isArray(userRoles) ? userRoles.filter((r: any) => typeof r === 'string') : [];
-        token.displayName = (user as { displayName?: string | null }).displayName || undefined;
-        token.name = (user as { name?: string }).name || undefined;
+        token.displayName = (user as { displayName?: string | null }).displayName || (user as any).name || (user as any).email;
+        token.name = (user as { name?: string }).name || (user as any).email;
         console.log("[jwt:token_after]", { displayName: token.displayName, rolesCount: (token.roles as any[])?.length });
         // Fallback: if the user record somehow has no tenant, use the default
         if (!token.tenantId) {
