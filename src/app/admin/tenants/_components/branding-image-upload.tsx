@@ -42,17 +42,36 @@ export function BrandingImageUpload({ label, value, onChange, tenantId, type, hi
       return;
     }
     setUploading(true);
-    const fd = new FormData();
-    fd.append("file", file);
-    const res = await fetch(
-      `/api/admin/tenants/${tenantId}/branding/upload?type=${type}`,
-      { method: "POST", body: fd },
-    );
-    setUploading(false);
-    if (res.ok) {
-      onChange(((await res.json()) as { url: string }).url);
-    } else {
-      setError(((await res.json()) as { error?: string }).error ?? "Upload failed");
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch(
+        `/api/admin/tenants/${tenantId}/branding/upload?type=${type}`,
+        { method: "POST", body: fd },
+      );
+
+      if (res.ok) {
+        onChange(((await res.json()) as { url: string }).url);
+        return;
+      }
+
+      const contentType = res.headers.get("content-type") ?? "";
+      if (contentType.includes("application/json")) {
+        const payload = (await res.json()) as { error?: string };
+        setError(payload.error ?? "Upload failed");
+        return;
+      }
+
+      if (res.status === 413) {
+        setError("Upload rejected by proxy. Increase reverse-proxy body size (client_max_body_size) to at least 2 MB.");
+        return;
+      }
+
+      setError(`Upload failed (HTTP ${res.status})`);
+    } catch {
+      setError("Upload failed due to a network or server error");
+    } finally {
+      setUploading(false);
     }
   }
 
