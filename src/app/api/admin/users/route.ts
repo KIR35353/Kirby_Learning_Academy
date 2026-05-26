@@ -33,8 +33,11 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
+  const isSuperAdmin = roles.includes("SUPER_ADMIN");
+
   const tenantId = (session.user as Record<string, unknown>)?.tenantId as string;
   const { searchParams } = new URL(req.url);
+  const tenantFilterId = searchParams.get("tenantId") ?? undefined;
   const search = searchParams.get("search") ?? "";
   const departmentId = searchParams.get("departmentId") ?? undefined;
   const locationId = searchParams.get("locationId") ?? undefined;
@@ -45,7 +48,9 @@ export async function GET(req: NextRequest) {
   const skip = (page - 1) * limit;
 
   const where = {
-    tenantId,
+    ...((isSuperAdmin && tenantFilterId)
+      ? { tenantId: tenantFilterId }
+      : (!isSuperAdmin ? { tenantId } : {})),
     ...(search && {
       OR: [
         { email: { contains: search, mode: "insensitive" as const } },

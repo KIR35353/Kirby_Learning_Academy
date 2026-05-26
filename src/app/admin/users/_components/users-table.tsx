@@ -83,6 +83,7 @@ export function UsersTable({ departments, locations, allRoles, tenants, isSuperA
     pages: 1,
   });
   const [search, setSearch] = useState("");
+  const [filterTenantId, setFilterTenantId] = useState("");
   const [filterActive, setFilterActive] = useState<string>("");
   const [filterContractor, setFilterContractor] = useState<string>("");
   const [loading, setLoading] = useState(true);
@@ -96,6 +97,7 @@ export function UsersTable({ departments, locations, allRoles, tenants, isSuperA
       const params = new URLSearchParams({
         page: String(page),
         limit: "25",
+        ...(isSuperAdmin && filterTenantId && { tenantId: filterTenantId }),
         ...(search && { search }),
         ...(filterActive && { isActive: filterActive }),
         ...(filterContractor && { isContractor: filterContractor }),
@@ -108,13 +110,13 @@ export function UsersTable({ departments, locations, allRoles, tenants, isSuperA
       }
       setLoading(false);
     },
-    [search, filterActive, filterContractor],
+    [search, filterTenantId, filterActive, filterContractor, isSuperAdmin],
   );
 
   useEffect(() => {
     const timer = setTimeout(() => fetchUsers(1), search ? 300 : 0);
     return () => clearTimeout(timer);
-  }, [search, filterActive, filterContractor, fetchUsers]);
+  }, [search, filterTenantId, filterActive, filterContractor, fetchUsers]);
 
   async function deactivateUser(id: string) {
     if (!confirm("Deactivate this user? They will no longer be able to sign in.")) return;
@@ -189,6 +191,18 @@ export function UsersTable({ departments, locations, allRoles, tenants, isSuperA
             className="pl-9"
           />
         </div>
+        {isSuperAdmin && (
+          <select
+            value={filterTenantId}
+            onChange={(e) => setFilterTenantId(e.target.value)}
+            className="rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
+          >
+            <option value="">All tenants</option>
+            {tenants.map((t) => (
+              <option key={t.id} value={t.id}>{t.name}</option>
+            ))}
+          </select>
+        )}
         <select
           value={filterActive}
           onChange={(e) => setFilterActive(e.target.value)}
