@@ -33,7 +33,8 @@ type TopNavProps = {
 // ── Component ──────────────────────────────────────────────────────────────
 export function TopNav({ pageTitle }: TopNavProps) {
   const { data: session } = useSession();
-  const userName  = session?.user?.name  ?? session?.user?.email ?? "User";
+  const sessionUser = session?.user as ({ displayName?: string | null } & typeof session.user) | undefined;
+  const userName  = sessionUser?.displayName ?? sessionUser?.name ?? sessionUser?.email ?? "User";
   const userEmail = session?.user?.email ?? "";
   const userImage = (session?.user as { image?: string } | undefined)?.image ?? undefined;
   const initials  = userName.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2) || "??";

@@ -46,6 +46,7 @@ const credentialsProvider = Credentials({
       id: user.id,
       email: user.email,
       name: user.name ?? user.email,
+      displayName: user.displayName,
       image: user.avatarUrl,
       tenantId: user.tenantId,
       isContractor: user.isContractor,
@@ -157,6 +158,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.tenantId = (user as { tenantId?: string }).tenantId;
         token.isContractor = (user as { isContractor?: boolean }).isContractor;
         token.roles = (user as { roles?: string[] }).roles ?? [];
+        token.displayName = (user as { displayName?: string | null }).displayName ?? undefined;
         // Fallback: if the user record somehow has no tenant, use the default
         if (!token.tenantId) {
           token.tenantId = (await getDefaultTenantId()) ?? undefined;
@@ -172,9 +174,23 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (dbUser) {
           token.tenantId = dbUser.tenantId || ((await getDefaultTenantId()) ?? undefined);
           token.isContractor = dbUser.isContractor;
+          token.displayName = dbUser.displayName ?? undefined;
+          token.name = dbUser.name ?? dbUser.email;
           token.roles = dbUser.roles.map(
             (ur: { role: { name: string } }) => ur.role.name,
           );
+        }
+      }
+
+      // Backfill display name for existing sessions created before displayName was included in the token.
+      if (token.sub && (!token.displayName || token.name === "User")) {
+        const dbUser = await db.user.findUnique({
+          where: { id: token.sub },
+          select: { displayName: true, name: true, email: true },
+        });
+        if (dbUser) {
+          token.displayName = dbUser.displayName ?? undefined;
+          token.name = dbUser.name ?? dbUser.email;
         }
       }
       return token;
@@ -186,6 +202,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         u.tenantId = token.tenantId;
         u.isContractor = token.isContractor;
         u.roles = token.roles;
+        u.displayName = token.displayName;
       }
       return session;
     },
