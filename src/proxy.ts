@@ -55,12 +55,11 @@ export default auth((req: NextAuthRequest) => {
     }
   }
 
-  // Manager routes require MANAGER, COMPLIANCE_OFFICER, or admin roles
+  // Manager routes require MANAGER or admin roles
   if (managerRoutes.some((r) => pathname.startsWith(r))) {
     const managerRoles = [
       "SUPER_ADMIN",
       "TENANT_ADMIN",
-      "COMPLIANCE_OFFICER",
       "MANAGER",
     ];
     if (!roles.some((r) => managerRoles.includes(r))) {

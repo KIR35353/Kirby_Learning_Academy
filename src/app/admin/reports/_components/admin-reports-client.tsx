@@ -28,6 +28,7 @@ interface OverviewData {
 interface CourseEffRow {
   id: string; title: string; status: string;
   totalEnrollments: number; completionRate: number; passRate: number; avgScore: number | null;
+  avgTimeMinutes: number | null;
 }
 
 const PIE_COLORS = ["#22c55e", "#eab308", "#ef4444", "#94a3b8", "#f97316"];
@@ -335,6 +336,7 @@ export function AdminReportsClient({
                       <th className="px-4 py-3 text-right">Completion %</th>
                       <th className="px-4 py-3 text-right">Pass %</th>
                       <th className="px-4 py-3 text-right">Avg Score</th>
+                      <th className="px-4 py-3 text-right">Avg Time</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5">
@@ -353,10 +355,17 @@ export function AdminReportsClient({
                           </Badge>
                         </td>
                         <td className="px-4 py-3 text-right text-white/60">{r.avgScore !== null ? `${r.avgScore}%` : "—"}</td>
+                        <td className="px-4 py-3 text-right text-white/60">
+                          {r.avgTimeMinutes !== null
+                            ? r.avgTimeMinutes >= 60
+                              ? `${Math.floor(r.avgTimeMinutes / 60)}h ${r.avgTimeMinutes % 60}m`
+                              : `${r.avgTimeMinutes}m`
+                            : "—"}
+                        </td>
                       </tr>
                     ))}
                     {effectiveness.length === 0 && (
-                      <tr><td colSpan={5} className="px-4 py-8 text-center text-white/30 text-sm">No data. Click Load to fetch results.</td></tr>
+                      <tr><td colSpan={6} className="px-4 py-8 text-center text-white/30 text-sm">No data. Click Load to fetch results.</td></tr>
                     )}
                   </tbody>
                 </table>

@@ -10,7 +10,16 @@ interface TenantRow {
   id: string;
   name: string;
   slug: string;
+  domain: string | null;
   logoUrl: string | null;
+  faviconUrl: string | null;
+  loginBannerUrl: string | null;
+  appName: string | null;
+  supportEmail: string | null;
+  primaryColor: string | null;
+  primaryForegroundColor: string | null;
+  sidebarColor: string | null;
+  accentColor: string | null;
   createdAt: string;
   _count: { users: number; departments: number; businessUnits: number };
 }
@@ -64,6 +73,9 @@ export function TenantsTable({ initial }: Props) {
                 <div>
                   <p className="font-semibold leading-tight">{t.name}</p>
                   <p className="text-xs text-muted-foreground">{t.slug}</p>
+                  {t.domain && (
+                    <p className="text-xs text-muted-foreground">@{t.domain}</p>
+                  )}
                 </div>
               </div>
               <Button

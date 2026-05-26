@@ -15,13 +15,16 @@ export default async function AdminUsersPage() {
     redirect("/unauthorized");
   }
 
+  const isSuperAdmin = roles.includes("SUPER_ADMIN");
   const tenantId = (session.user as Record<string, unknown>)?.tenantId as string;
 
-  const [departments, locations, jobTitles, allRoles] = await Promise.all([
+  const [departments, locations, allRoles, tenants] = await Promise.all([
     db.department.findMany({ where: { tenantId }, orderBy: { name: "asc" } }),
     db.location.findMany({ where: { tenantId }, orderBy: { name: "asc" } }),
-    db.jobTitle.findMany({ where: { tenantId }, orderBy: { name: "asc" } }),
     db.role.findMany({ orderBy: { name: "asc" } }),
+    isSuperAdmin
+      ? db.tenant.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } })
+      : Promise.resolve([]),
   ]);
 
   return (
@@ -33,8 +36,9 @@ export default async function AdminUsersPage() {
           <UsersTable
             departments={departments}
             locations={locations}
-            jobTitles={jobTitles}
             allRoles={allRoles}
+            tenants={tenants}
+            isSuperAdmin={isSuperAdmin}
           />
         </main>
       </div>

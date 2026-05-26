@@ -81,32 +81,76 @@ export async function POST(req: NextRequest) {
 
   const meta = extractManifestMeta(manifest);
 
-  // ── Create Course record ─────────────────────────────────────────────────
-  const course = await db.course.create({
-    data: {
-      title:                meta.title,
-      description:          meta.description ?? null,
-      category:             meta.category ?? null,
-      targetAudience:       meta.targetAudience ?? null,
-      objectives:           meta.objectives,
-      duration:             meta.duration ?? null,
-      isContractorVisible:  meta.contractorVisible,
-      complianceTags:       meta.complianceTags,
-      status:               "DRAFT",
-      tenantId:             session.user.tenantId,
-      createdById:          session.user.id,
-      tags:      { create: meta.tags.map((tag) => ({ tag })) },
-      languages: { create: [{ language: "en", isDefault: true }] },
-    },
-    include: {
-      tags: true,
-      activeVersion: { select: { versionNumber: true } },
-      _count: { select: { versions: true } },
-    },
-  });
+  try {
+  // ── Upsert: update existing course if GUID matches, else create ──────────
+  const existingCourse = meta.externalId
+    ? await db.course.findFirst({
+        where: { tenantId: session.user.tenantId!, externalId: meta.externalId },
+        include: {
+          tags: true,
+          activeVersion: { select: { versionNumber: true } },
+          _count: { select: { versions: true } },
+        },
+      })
+    : null;
+
+  let course: Awaited<ReturnType<typeof db.course.findUnique>> & { _count: { versions: number } };
+  let isUpdate = false;
+
+  if (existingCourse) {
+    // ── UPDATE path: refresh metadata, keep existing record ───────────────
+    isUpdate = true;
+    // Replace tags entirely
+    await db.courseTag.deleteMany({ where: { courseId: existingCourse.id } });
+    course = await db.course.update({
+      where: { id: existingCourse.id },
+      data: {
+        title:               meta.title,
+        description:         meta.description ?? null,
+        category:            meta.category ?? null,
+        targetAudience:      meta.targetAudience ?? null,
+        objectives:          meta.objectives,
+        duration:            meta.duration ?? null,
+        isContractorVisible: meta.contractorVisible,
+        complianceTags:      meta.complianceTags,
+        tags: { create: meta.tags.map((tag) => ({ tag })) },
+      },
+      include: {
+        tags: true,
+        activeVersion: { select: { versionNumber: true } },
+        _count: { select: { versions: true } },
+      },
+    }) as typeof course;
+  } else {
+    // ── CREATE path ────────────────────────────────────────────────────────
+    course = await db.course.create({
+      data: {
+        title:                meta.title,
+        description:          meta.description ?? null,
+        category:             meta.category ?? null,
+        targetAudience:       meta.targetAudience ?? null,
+        objectives:           meta.objectives,
+        duration:             meta.duration ?? null,
+        isContractorVisible:  meta.contractorVisible,
+        complianceTags:       meta.complianceTags,
+        status:               "DRAFT",
+        tenantId:             session.user.tenantId,
+        createdById:          session.user.id,
+        externalId:           meta.externalId ?? null,
+        tags:      { create: meta.tags.map((tag) => ({ tag })) },
+        languages: { create: [{ language: "en", isDefault: true }] },
+      },
+      include: {
+        tags: true,
+        activeVersion: { select: { versionNumber: true } },
+        _count: { select: { versions: true } },
+      },
+    }) as typeof course;
+  }
 
   // ── Upload files to S3 ───────────────────────────────────────────────────
-  const s3Prefix     = `courses/${course.id}/v1/`;
+  const nextVersionNumber = (course!._count.versions ?? 0) + 1;
+  const s3Prefix = `courses/${course!.id}/v${nextVersionNumber}/`;
   const uploadErrors: string[] = [];
 
   for (const entry of entries) {
@@ -126,8 +170,10 @@ export async function POST(req: NextRequest) {
   }
 
   if (uploadErrors.length > 0) {
-    // Roll back the course record — content is unusable without S3
-    await db.course.delete({ where: { id: course.id } });
+    // Roll back only if we created a new course record — keep existing on update
+    if (!isUpdate) {
+      await db.course.delete({ where: { id: course!.id } });
+    }
     return NextResponse.json(
       { error: "Some files failed to upload to S3", details: uploadErrors },
       { status: 500 },
@@ -143,8 +189,8 @@ export async function POST(req: NextRequest) {
   // ── Create CourseVersion and set as active ───────────────────────────────
   const version = await db.courseVersion.create({
     data: {
-      courseId:          course.id,
-      versionNumber:     1,
+      courseId:          course!.id,
+      versionNumber:     nextVersionNumber,
       s3Prefix,
       manifestSnapshot:  manifest as never,
       originalFileName:  (file as File).name ?? null,
@@ -156,14 +202,19 @@ export async function POST(req: NextRequest) {
   });
 
   await db.course.update({
-    where: { id: course.id },
+    where: { id: course!.id },
     data:  { activeVersionId: version.id, ...(thumbnailUrl ? { thumbnailUrl } : {}) },
   });
 
   return NextResponse.json(
-    { course: { ...course, activeVersionId: version.id }, version },
-    { status: 201 },
+    { course: { ...course, activeVersionId: version.id }, version, updated: isUpdate },
+    { status: isUpdate ? 200 : 201 },
   );
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("[import] unhandled error:", message);
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────
@@ -181,6 +232,9 @@ function extractManifestMeta(manifest: Record<string, unknown>) {
   const title =
     (course?.title as string | undefined) ??
     (typeof manifest.courseTitle === "string" ? manifest.courseTitle : "Untitled Course");
+
+  // Stable external ID — from course.guid
+  const externalId = (course?.guid as string | undefined) ?? undefined;
 
   // Duration — parse "45-minute course" → 45
   const durationBadge  = intro?.duration_badge as string | undefined;
@@ -231,7 +285,7 @@ function extractManifestMeta(manifest: Record<string, unknown>) {
     ? (kla?.cover_image as string | undefined)
     : undefined;
 
-  return { title, description, category, targetAudience, objectives, duration, tags, complianceTags, contractorVisible, releaseDate, revisionNotes, thumbnailPath };
+  return { title, externalId, description, category, targetAudience, objectives, duration, tags, complianceTags, contractorVisible, releaseDate, revisionNotes, thumbnailPath };
 }
 
 const IMAGE_EXTS = new Set(["jpg", "jpeg", "png", "webp", "gif"]);

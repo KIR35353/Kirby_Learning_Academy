@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { Prisma } from "@/generated/prisma/client";
 import { z } from "zod";
 
 const completeSchema = z.object({
@@ -70,14 +71,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         userId: session.user.id!,
         courseId: enrollment.courseId,
         totalSeconds: totalSeconds ?? null,
-        sectionStats: sections ?? null,
-        questionStats: questions ?? null,
+        sectionStats: sections !== undefined ? (sections ?? Prisma.DbNull) : Prisma.DbNull,
+        questionStats: questions !== undefined ? (questions ?? Prisma.DbNull) : Prisma.DbNull,
         rawPayload: body,
       },
       update: {
         totalSeconds: totalSeconds ?? null,
-        sectionStats: sections ?? null,
-        questionStats: questions ?? null,
+        sectionStats: sections !== undefined ? (sections ?? Prisma.DbNull) : Prisma.DbNull,
+        questionStats: questions !== undefined ? (questions ?? Prisma.DbNull) : Prisma.DbNull,
         rawPayload: body,
       },
     });

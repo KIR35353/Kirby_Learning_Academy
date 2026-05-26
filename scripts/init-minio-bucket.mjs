@@ -31,8 +31,9 @@ try {
   }
 }
 
-// ── Set public-read policy for courses/ prefix ────────────────────────────────
-// Allows the browser to load CBT assets directly from MinIO in an iframe.
+// ── Set public-read policy for courses/ and tenants/*/branding/ prefixes ────────
+// courses/*          — CBT assets loaded directly by the browser in an iframe
+// tenants/*/branding — logos, favicons, login banners served as <img>/<link> tags
 const policy = {
   Version: "2012-10-17",
   Statement: [
@@ -43,11 +44,18 @@ const policy = {
       Action: ["s3:GetObject"],
       Resource: [`arn:aws:s3:::${BUCKET}/courses/*`],
     },
+    {
+      Sid: "PublicReadTenantBranding",
+      Effect: "Allow",
+      Principal: { AWS: ["*"] },
+      Action: ["s3:GetObject"],
+      Resource: [`arn:aws:s3:::${BUCKET}/tenants/*`],
+    },
   ],
 };
 
 await s3.send(
   new PutBucketPolicyCommand({ Bucket: BUCKET, Policy: JSON.stringify(policy) }),
 );
-console.log(`Public-read policy applied to ${BUCKET}/courses/*`);
+console.log(`Public-read policy applied to ${BUCKET}/courses/* and ${BUCKET}/tenants/*`);
 

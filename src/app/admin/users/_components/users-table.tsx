@@ -8,6 +8,13 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { UserFormDialog } from "./user-form-dialog";
 import { ImportDialog } from "./import-dialog";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Search,
   UserPlus,
   Upload,
@@ -16,12 +23,13 @@ import {
   HardHat,
   ChevronLeft,
   ChevronRight,
+  Trash2,
 } from "lucide-react";
 
 type Department = { id: string; name: string };
 type Location = { id: string; name: string };
-type JobTitle = { id: string; name: string };
 type Role = { id: string; name: string };
+type Tenant = { id: string; name: string };
 
 type User = {
   id: string;
@@ -36,6 +44,7 @@ type User = {
   department: { id: string; name: string } | null;
   location: { id: string; name: string } | null;
   jobTitle: { id: string; name: string } | null;
+  tenant: { id: string; name: string } | null;
   roles: { role: { id: string; name: string } }[];
 };
 
@@ -44,31 +53,28 @@ type Pagination = { page: number; limit: number; total: number; pages: number };
 interface Props {
   departments: Department[];
   locations: Location[];
-  jobTitles: JobTitle[];
   allRoles: Role[];
+  tenants: Tenant[];
+  isSuperAdmin: boolean;
 }
 
 const ROLE_LABELS: Record<string, string> = {
   SUPER_ADMIN: "Super Admin",
   TENANT_ADMIN: "Admin",
-  COMPLIANCE_OFFICER: "Compliance",
   MANAGER: "Manager",
   INSTRUCTOR: "Instructor",
-  EMPLOYEE: "Employee",
-  CONTRACTOR: "Contractor",
+  STUDENT: "Student",
 };
 
 const ROLE_COLORS: Record<string, string> = {
   SUPER_ADMIN: "bg-purple-100 text-purple-800",
   TENANT_ADMIN: "bg-blue-100 text-blue-800",
-  COMPLIANCE_OFFICER: "bg-amber-100 text-amber-800",
   MANAGER: "bg-green-100 text-green-800",
   INSTRUCTOR: "bg-teal-100 text-teal-800",
-  EMPLOYEE: "bg-gray-100 text-gray-700",
-  CONTRACTOR: "bg-orange-100 text-orange-800",
+  STUDENT: "bg-gray-100 text-gray-700",
 };
 
-export function UsersTable({ departments, locations, jobTitles, allRoles }: Props) {
+export function UsersTable({ departments, locations, allRoles, tenants, isSuperAdmin }: Props) {
   const [users, setUsers] = useState<User[]>([]);
   const [pagination, setPagination] = useState<Pagination>({
     page: 1,
@@ -113,6 +119,24 @@ export function UsersTable({ departments, locations, jobTitles, allRoles }: Prop
   async function deactivateUser(id: string) {
     if (!confirm("Deactivate this user? They will no longer be able to sign in.")) return;
     await fetch(`/api/admin/users/${id}`, { method: "DELETE" });
+    fetchUsers(pagination.page);
+  }
+
+  async function permanentlyDeleteUser(user: User) {
+    const confirmed = confirm(
+      `Permanently delete "${
+        user.displayName ?? user.name ?? user.email
+      }" (${user.email})?\n\nThis will erase all their enrollments, certifications, assessments, and account data. This cannot be undone.`,
+    );
+    if (!confirmed) return;
+    const res = await fetch(`/api/admin/users/${user.id}?permanent=true`, {
+      method: "DELETE",
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      alert(data.error ?? "Failed to delete user.");
+      return;
+    }
     fetchUsers(pagination.page);
   }
 
@@ -276,26 +300,33 @@ export function UsersTable({ departments, locations, jobTitles, allRoles }: Prop
                     )}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setEditUser(user)}
-                        className="h-7 px-2 text-xs"
-                      >
-                        Edit
-                      </Button>
-                      {user.isActive && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => deactivateUser(user.id)}
-                          className="h-7 px-2 text-xs text-destructive hover:text-destructive"
+                    <DropdownMenu>
+                      <DropdownMenuTrigger className="inline-flex h-7 w-7 items-center justify-center rounded-md p-0 text-sm font-medium hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                        <MoreHorizontal className="h-4 w-4" />
+                        <span className="sr-only">Actions</span>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => setEditUser(user)}>
+                          Edit
+                        </DropdownMenuItem>
+                        {user.isActive && (
+                          <DropdownMenuItem
+                            onClick={() => deactivateUser(user.id)}
+                            className="text-destructive focus:text-destructive"
+                          >
+                            Deactivate
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => permanentlyDeleteUser(user)}
+                          className="text-destructive focus:text-destructive"
                         >
-                          Deactivate
-                        </Button>
-                      )}
-                    </div>
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Delete Permanently
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </td>
                 </tr>
               ))
@@ -337,8 +368,9 @@ export function UsersTable({ departments, locations, jobTitles, allRoles }: Prop
         onOpenChange={setCreateOpen}
         departments={departments}
         locations={locations}
-        jobTitles={jobTitles}
         allRoles={allRoles}
+        tenants={tenants}
+        isSuperAdmin={isSuperAdmin}
         onSuccess={() => fetchUsers(1)}
       />
 
@@ -350,8 +382,9 @@ export function UsersTable({ departments, locations, jobTitles, allRoles }: Prop
           user={editUser}
           departments={departments}
           locations={locations}
-          jobTitles={jobTitles}
           allRoles={allRoles}
+          tenants={tenants}
+          isSuperAdmin={isSuperAdmin}
           onSuccess={() => {
             fetchUsers(pagination.page);
             setEditUser(null);

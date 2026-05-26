@@ -92,9 +92,9 @@ export async function GET() {
   }
 
   const template = [
-    "name,email,department,job_title,location,hire_date,is_contractor,role",
-    "Jane Smith,jane.smith@example.com,Engineering,Software Engineer,Houston TX,2024-01-15,false,EMPLOYEE",
-    "John Contractor,john@vendor.com,Operations,Consultant,,, true,CONTRACTOR",
+    "name,email,department,job_title,location,hire_date,role",
+    "Jane Smith,jane.smith@example.com,Engineering,Software Engineer,Houston TX,2024-01-15,STUDENT",
+    "John Manager,john.manager@example.com,Operations,Team Lead,,2023-06-01,MANAGER",
   ].join("\r\n");
 
   return new Response(template, {
@@ -135,38 +135,51 @@ export async function POST(req: NextRequest) {
   }
 
   // Resolve default role
-  const employeeRole = await db.role.findFirst({ where: { name: "EMPLOYEE" } });
-  const contractorRole = await db.role.findFirst({ where: { name: "CONTRACTOR" } });
+  const studentRole = await db.role.findFirst({ where: { name: "STUDENT" } });
 
   // Caches for org records (avoid redundant DB hits)
   const deptCache = new Map<string, string>();
   const locCache  = new Map<string, string>();
   const jtCache   = new Map<string, string>();
 
+  /** Strip BOM, invisible Unicode, and control chars that `.trim()` misses. */
+  function sanitizeOrgName(raw: string): string {
+    return raw
+      .replace(/[\uFEFF\u200B\u200C\u200D\u00AD\u2060\uFFFE]/g, "")
+      .replace(/[\x00-\x1F\x7F]/g, "")
+      .trim();
+  }
+
   async function getDeptId(name: string) {
-    const key = name.toLowerCase();
+    const clean = sanitizeOrgName(name);
+    if (!clean) return undefined;
+    const key = clean.toLowerCase();
     if (deptCache.has(key)) return deptCache.get(key)!;
-    const existing = await db.department.findFirst({ where: { tenantId, name: { equals: name, mode: "insensitive" } } });
+    const existing = await db.department.findFirst({ where: { tenantId, name: { equals: clean, mode: "insensitive" } } });
     const id = existing?.id ?? (preview ? `preview-dept-${key}` :
-      (await db.department.create({ data: { name, tenantId } })).id);
+      (await db.department.create({ data: { name: clean, tenantId } })).id);
     deptCache.set(key, id);
     return id;
   }
   async function getLocId(name: string) {
-    const key = name.toLowerCase();
+    const clean = sanitizeOrgName(name);
+    if (!clean) return undefined;
+    const key = clean.toLowerCase();
     if (locCache.has(key)) return locCache.get(key)!;
-    const existing = await db.location.findFirst({ where: { tenantId, name: { equals: name, mode: "insensitive" } } });
+    const existing = await db.location.findFirst({ where: { tenantId, name: { equals: clean, mode: "insensitive" } } });
     const id = existing?.id ?? (preview ? `preview-loc-${key}` :
-      (await db.location.create({ data: { name, tenantId } })).id);
+      (await db.location.create({ data: { name: clean, tenantId } })).id);
     locCache.set(key, id);
     return id;
   }
   async function getJtId(name: string) {
-    const key = name.toLowerCase();
+    const clean = sanitizeOrgName(name);
+    if (!clean) return undefined;
+    const key = clean.toLowerCase();
     if (jtCache.has(key)) return jtCache.get(key)!;
-    const existing = await db.jobTitle.findFirst({ where: { tenantId, name: { equals: name, mode: "insensitive" } } });
+    const existing = await db.jobTitle.findFirst({ where: { tenantId, name: { equals: clean, mode: "insensitive" } } });
     const id = existing?.id ?? (preview ? `preview-jt-${key}` :
-      (await db.jobTitle.create({ data: { name, tenantId } })).id);
+      (await db.jobTitle.create({ data: { name: clean, tenantId } })).id);
     jtCache.set(key, id);
     return id;
   }
@@ -214,11 +227,12 @@ export async function POST(req: NextRequest) {
       continue;
     }
 
-    // Determine role to assign
+    // Determine role to assign — default is STUDENT
     const roleRow = (r.role ?? "").toUpperCase().trim();
-    const desiredRole = isContractor ? contractorRole : (
-      roleRow && roleRow !== "EMPLOYEE" ? await db.role.findFirst({ where: { name: roleRow } }) : employeeRole
-    );
+    const desiredRole =
+      roleRow && roleRow !== "STUDENT" && roleRow !== "EMPLOYEE"
+        ? await db.role.findFirst({ where: { name: roleRow } }) ?? studentRole
+        : studentRole;
 
     if (preview) {
       previewRows.push({
@@ -229,7 +243,7 @@ export async function POST(req: NextRequest) {
         hire_date: hireDate?.toISOString().split("T")[0] ?? null,
         is_contractor: isContractor,
         is_active: isActive,
-        role: desiredRole?.name ?? "EMPLOYEE",
+        role: desiredRole?.name ?? "STUDENT",
         action: "create", // will be refined below
       });
       continue;

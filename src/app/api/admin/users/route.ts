@@ -1,20 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
+import { randomBytes } from "crypto";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { sendEmail, welcomeInviteEmail } from "@/lib/email";
 
 const createUserSchema = z.object({
   email: z.string().email(),
   name: z.string().min(1),
-  password: z.string().min(8).optional(),
+  tenantId: z.string().optional(),
   isContractor: z.boolean().default(false),
   departmentId: z.string().optional(),
   locationId: z.string().optional(),
-  jobTitleId: z.string().optional(),
+  jobTitle: z.string().optional(),
   hireDate: z.string().optional(),
-  roleNames: z.array(z.string()).default(["EMPLOYEE"]),
+  roleNames: z.array(z.string()).default(["STUDENT"]),
 });
+
+function generateTempPassword(): string {
+  // 16 URL-safe chars — uppercase, lowercase, digits, - and _
+  return randomBytes(12).toString("base64url").slice(0, 16);
+}
 
 // GET /api/admin/users — list users (admins only)
 export async function GET(req: NextRequest) {
@@ -72,6 +79,7 @@ export async function GET(req: NextRequest) {
         department: { select: { id: true, name: true } },
         location: { select: { id: true, name: true } },
         jobTitle: { select: { id: true, name: true } },
+        tenant: { select: { id: true, name: true } },
         roles: { select: { role: { select: { id: true, name: true } } } },
       },
     }),
@@ -94,7 +102,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const tenantId = (session.user as Record<string, unknown>)?.tenantId as string;
+  const sessionTenantId = (session.user as Record<string, unknown>)?.tenantId as string;
 
   let body: unknown;
   try {
@@ -108,19 +116,35 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const { email, name, password, isContractor, departmentId, locationId, jobTitleId, hireDate, roleNames } = parsed.data;
+  const { email, name, tenantId: bodyTenantId, isContractor, departmentId, locationId, jobTitle, hireDate, roleNames } = parsed.data;
+
+  // SUPER_ADMIN may specify a different tenant; all others inherit their own
+  const tenantId =
+    roles.includes("SUPER_ADMIN") && bodyTenantId ? bodyTenantId : sessionTenantId;
 
   const existing = await db.user.findUnique({ where: { email } });
   if (existing) {
     return NextResponse.json({ error: "Email already registered" }, { status: 409 });
   }
 
-  const passwordHash = password ? await bcrypt.hash(password, 12) : null;
+  const tempPassword = generateTempPassword();
+  const passwordHash = await bcrypt.hash(tempPassword, 12);
 
   // Resolve role IDs
   const roleRecords = await db.role.findMany({
     where: { name: { in: roleNames } },
   });
+
+  // Resolve freeform job title text → FK (upsert by name within tenant)
+  let jobTitleId: string | null = null;
+  if (jobTitle?.trim()) {
+    const jt = await db.jobTitle.upsert({
+      where: { tenantId_name: { tenantId, name: jobTitle.trim() } },
+      create: { tenantId, name: jobTitle.trim() },
+      update: {},
+    });
+    jobTitleId = jt.id;
+  }
 
   const user = await db.user.create({
     data: {
@@ -131,7 +155,7 @@ export async function POST(req: NextRequest) {
       tenantId,
       departmentId: departmentId || null,
       locationId: locationId || null,
-      jobTitleId: jobTitleId || null,
+      jobTitleId,
       hireDate: hireDate ? new Date(hireDate) : null,
       roles: {
         create: roleRecords.map((r: { id: string }) => ({ roleId: r.id })),
@@ -147,5 +171,15 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  return NextResponse.json({ user }, { status: 201 });
+  // Send welcome / invite email (fire-and-forget — don't block the response)
+  const loginUrl = `${process.env.NEXTAUTH_URL ?? "http://localhost:3000"}/login`;
+  sendEmail({
+    to: email,
+    subject: "Welcome to Kirby Learning Academy — Your Account is Ready",
+    html: welcomeInviteEmail(name, email, tempPassword, loginUrl),
+  }).catch((err) =>
+    console.error("[api/admin/users] Failed to send invite email:", err),
+  );
+
+  return NextResponse.json({ user, tempPassword, loginUrl }, { status: 201 });
 }

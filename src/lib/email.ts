@@ -112,3 +112,41 @@ export function broadcastEmail(title: string, body: string): string {
     <h2 style="color:#fff;margin-top:0;">${title}</h2>
     <p>${body.replace(/\n/g, "<br/>")}</p>`);
 }
+
+export function welcomeInviteEmail(
+  name: string,
+  email: string,
+  tempPassword: string,
+  loginUrl: string,
+): string {
+  return layout(`
+    <h2 style="color:#fff;margin-top:0;">Welcome to Kirby Learning Academy!</h2>
+    <p>Hi ${name},</p>
+    <p>Your account has been created. You now have access to your training courses, certifications, and learning paths.</p>
+    <table style="margin:20px 0;width:100%;border-collapse:collapse;">
+      <tr>
+        <td style="padding:10px 14px;background:rgba(255,255,255,0.05);border-radius:8px 8px 0 0;color:rgba(255,255,255,0.5);font-size:12px;text-transform:uppercase;letter-spacing:.5px;">Your login details</td>
+      </tr>
+      <tr>
+        <td style="padding:14px;background:rgba(255,255,255,0.05);border-radius:0 0 8px 8px;">
+          <table style="width:100%;border-collapse:collapse;">
+            <tr>
+              <td style="padding:5px 0;color:rgba(255,255,255,0.5);font-size:13px;width:140px;">Email address</td>
+              <td style="padding:5px 0;color:#fff;font-weight:600;">${email}</td>
+            </tr>
+            <tr>
+              <td style="padding:5px 0;color:rgba(255,255,255,0.5);font-size:13px;">Temporary password</td>
+              <td style="padding:5px 0;color:#cc3d00;font-weight:700;font-family:monospace;font-size:16px;letter-spacing:1px;">${tempPassword}</td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+    <p style="color:rgba(255,255,255,0.6);font-size:13px;margin-top:0;">
+      For your security, please change your password after your first login.
+    </p>
+    ${btn("Sign In to KLA", loginUrl)}
+    <p style="margin-top:24px;color:rgba(255,255,255,0.4);font-size:12px;">
+      If you weren't expecting this email, please contact your administrator.
+    </p>`);
+}

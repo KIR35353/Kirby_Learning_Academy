@@ -24,11 +24,26 @@ export interface SyncResult {
   errors: string[];
 }
 
+/**
+ * Strip BOM, invisible Unicode (zero-width spaces, soft hyphen, etc.),
+ * C0/C1 control characters, and surrounding whitespace from org names.
+ * Plain `.trim()` does not remove these characters.
+ */
+function sanitizeOrgName(name: string): string {
+  return name
+    .replace(/[\uFEFF\u200B\u200C\u200D\u00AD\u2060\uFFFE]/g, "") // BOM + invisible Unicode
+    .replace(/[\x00-\x1F\x7F]/g, "")                               // control chars
+    .trim();
+}
+
 async function upsertOrgRecord(
   model: "department" | "location" | "jobTitle" | "businessUnit",
   tenantId: string,
-  name: string,
+  rawName: string,
 ): Promise<string> {
+  const name = sanitizeOrgName(rawName);
+  if (!name) throw new Error(`Empty org name after sanitization (raw: ${JSON.stringify(rawName)})`);
+
   if (model === "department") {
     const rec = await db.department.upsert({
       where: { tenantId_name: { tenantId, name } },
@@ -75,9 +90,9 @@ export async function runHrisSync(
     errors: [],
   };
 
-  const employeeRole = await db.role.findUnique({ where: { name: "EMPLOYEE" } });
+  const employeeRole = await db.role.findUnique({ where: { name: "STUDENT" } });
   if (!employeeRole) {
-    result.errors.push("EMPLOYEE role not found in database — run db:seed first");
+    result.errors.push("STUDENT role not found in database — run db:seed first");
     return result;
   }
 

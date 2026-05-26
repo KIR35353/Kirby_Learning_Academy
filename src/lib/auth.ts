@@ -4,6 +4,7 @@ import MicrosoftEntraId from "next-auth/providers/microsoft-entra-id";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
+import { resolveTenantIdFromEmail } from "@/lib/tenant-domain";
 import type { Provider } from "next-auth/providers";
 
 /**
@@ -53,6 +54,12 @@ const credentialsProvider = Credentials({
   },
 });
 
+/** Returns the ID of the first-created tenant as a catch-all default. */
+async function getDefaultTenantId(): Promise<string | null> {
+  const tenant = await db.tenant.findFirst({ orderBy: { createdAt: "asc" } });
+  return tenant?.id ?? null;
+}
+
 /**
  * Microsoft Entra ID (Azure AD) SSO provider.
  * Activated when AUTH_MODE is "sso" or "both".
@@ -95,8 +102,48 @@ function buildProviders(): Provider[] {
   return providers;
 }
 
+// Extend the default PrismaAdapter so that SSO-created users automatically
+// get a tenantId derived from their email domain.  Without this override,
+// db.user.create would fail because tenantId is a required field.
+const baseAdapter = PrismaAdapter(db);
+const domainAwareAdapter = {
+  ...baseAdapter,
+  createUser: async (data: {
+    email: string;
+    name?: string | null;
+    image?: string | null;
+    emailVerified?: Date | null;
+  }) => {
+    const tenantId = await resolveTenantIdFromEmail(data.email);
+    if (!tenantId) {
+      throw new Error(
+        `SSO sign-in rejected: no tenant is registered for the email domain ` +
+          `"${data.email.split("@")[1]}". Please contact your administrator.`,
+      );
+    }
+    const user = await db.user.create({
+      data: {
+        email: data.email,
+        name: data.name ?? null,
+        avatarUrl: data.image ?? null,
+        emailVerified: data.emailVerified ?? null,
+        tenantId,
+        isActive: true,
+      },
+    });
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      image: user.avatarUrl,
+      emailVerified: user.emailVerified,
+    };
+  },
+};
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  adapter: PrismaAdapter(db),
+  adapter: domainAwareAdapter,
+  trustHost: true,
   session: { strategy: "jwt" },
   pages: {
     signIn: "/login",
@@ -110,6 +157,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.tenantId = (user as { tenantId?: string }).tenantId;
         token.isContractor = (user as { isContractor?: boolean }).isContractor;
         token.roles = (user as { roles?: string[] }).roles ?? [];
+        // Fallback: if the user record somehow has no tenant, use the default
+        if (!token.tenantId) {
+          token.tenantId = (await getDefaultTenantId()) ?? undefined;
+        }
       }
       // On SSO sign-in the user record exists in the DB via PrismaAdapter —
       // load tenantId + roles from DB so they land in the JWT.
@@ -119,7 +170,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           include: { roles: { include: { role: true } } },
         });
         if (dbUser) {
-          token.tenantId = dbUser.tenantId;
+          token.tenantId = dbUser.tenantId || ((await getDefaultTenantId()) ?? undefined);
           token.isContractor = dbUser.isContractor;
           token.roles = dbUser.roles.map(
             (ur: { role: { name: string } }) => ur.role.name,

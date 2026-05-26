@@ -13,7 +13,17 @@ async function requireSuperAdmin() {
 
 const updateSchema = z.object({
   name: z.string().min(1).max(100).optional(),
+  domain: z.string().regex(/^[a-z0-9][a-z0-9.-]*\.[a-z]{2,}$/, "Invalid domain format").nullable().optional(),
   logoUrl: z.string().url().nullable().optional(),
+  // Branding
+  faviconUrl: z.string().url().nullable().optional(),
+  loginBannerUrl: z.string().url().nullable().optional(),
+  appName: z.string().max(100).nullable().optional(),
+  supportEmail: z.string().email().nullable().optional(),
+  primaryColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable().optional(),
+  primaryForegroundColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable().optional(),
+  sidebarColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable().optional(),
+  accentColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable().optional(),
 });
 
 export async function PATCH(
@@ -30,6 +40,11 @@ export async function PATCH(
   const body = await request.json() as unknown;
   const parsed = updateSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+
+  if (parsed.data.domain) {
+    const domainTaken = await db.tenant.findFirst({ where: { domain: parsed.data.domain, NOT: { id } } });
+    if (domainTaken) return NextResponse.json({ error: "Domain already in use" }, { status: 409 });
+  }
 
   const updated = await db.tenant.update({ where: { id }, data: parsed.data });
   return NextResponse.json(updated);

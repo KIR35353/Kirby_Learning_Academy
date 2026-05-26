@@ -16,7 +16,17 @@ model Tenant {
   id          String   @id @default(cuid())
   name        String
   slug        String   @unique  // used in subdomain / header routing
-  logoUrl     String?
+  domain      String?  @unique  // email domain for auto-assignment (e.g. "kirbycorp.com")
+  logoUrl                String?
+  // Branding / white-labelling
+  primaryColor           String?  // hex e.g. "#cc3d00"
+  primaryForegroundColor String?  // hex e.g. "#ffffff"
+  sidebarColor           String?  // hex e.g. "#001030"
+  accentColor            String?  // hex e.g. "#1d5fa8"
+  faviconUrl             String?  // public URL
+  appName                String?  // display name shown in browser title / emails
+  loginBannerUrl         String?  // hero image on /login page
+  supportEmail           String?  // shown in footer / error pages
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -197,7 +207,7 @@ model User {
 // ── Roles & Permissions ──────────────────────────────────────────────────────
 model Role {
   id          String   @id @default(cuid())
-  name        String   @unique  // SUPER_ADMIN | TENANT_ADMIN | COMPLIANCE_OFFICER | MANAGER | INSTRUCTOR | EMPLOYEE | CONTRACTOR
+  name        String   @unique  // SUPER_ADMIN | TENANT_ADMIN | MANAGER | INSTRUCTOR | STUDENT
   description String?
   createdAt   DateTime @default(now())
 
@@ -314,6 +324,7 @@ enum CourseStatus {
 model Course {
   id                   String       @id @default(cuid())
   tenantId             String
+  externalId           String?      // GUID from manifest course.guid — stable across re-imports
   title                String
   description          String?      @db.Text
   category             String?
@@ -348,6 +359,7 @@ model Course {
   @@index([tenantId])
   @@index([status])
   @@index([tenantId, status])
+  @@unique([tenantId, externalId])
   @@map("courses")
 }
 

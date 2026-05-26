@@ -19,9 +19,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     where: { id, userId: session.user.id },
     include: {
       course: {
-        include: { activeVersion: { select: { s3Prefix: true, versionNumber: true } } },
+        include: { activeVersion: { select: { id: true, s3Prefix: true, versionNumber: true } } },
       },
-      courseVersion: { select: { s3Prefix: true } },
     },
   });
 
@@ -56,15 +55,20 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }
   }
 
-  const s3Prefix =
-    enrollment.courseVersion?.s3Prefix ??
-    enrollment.course.activeVersion?.s3Prefix;
+  // Always use the active version so re-imported content reaches learners immediately.
+  const activeVersion = enrollment.course.activeVersion;
+  const s3Prefix = activeVersion?.s3Prefix;
 
   if (!s3Prefix) {
     return NextResponse.json({ error: "No course content uploaded yet" }, { status: 409 });
   }
 
-  // Mark as IN_PROGRESS on first launch; record startedAt
+  // Mark as IN_PROGRESS on first launch; record startedAt.
+  // Also pin courseVersionId to the active version (update if stale).
+  const versionUpdate = activeVersion?.id && activeVersion.id !== enrollment.courseVersionId
+    ? { courseVersionId: activeVersion.id }
+    : {};
+
   if (enrollment.status === "NOT_STARTED") {
     await db.enrollment.update({
       where: { id },
@@ -72,14 +76,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         status: "IN_PROGRESS",
         startedAt: new Date(),
         attempts: { increment: 1 },
+        ...versionUpdate,
       },
     });
   } else if (enrollment.status === "IN_PROGRESS" || enrollment.status === "FAILED") {
-    // Re-launch: increment attempts
     await db.enrollment.update({
       where: { id },
-      data: { attempts: { increment: 1 } },
+      data: { attempts: { increment: 1 }, ...versionUpdate },
     });
+  } else if (Object.keys(versionUpdate).length > 0) {
+    // PASSED/COMPLETED but version is stale — update silently
+    await db.enrollment.update({ where: { id }, data: versionUpdate });
   }
 
   // Build the URL to CBT_Introduction.html

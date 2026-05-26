@@ -22,14 +22,42 @@ export function LaunchClient({ enrollmentId, courseId, courseTitle, launchUrl, c
   const [score, setScore] = useState<number | null>(null);
   const recordedRef = useRef(false);
 
+  // Compute the initial src once: resume from saved position if IN_PROGRESS.
+  // Validate the saved URL is from the same version prefix as launchUrl to avoid
+  // loading stale content after a course re-import.
+  const [activeSrc] = useState(() => {
+    if (currentStatus === "IN_PROGRESS") {
+      const saved = localStorage.getItem(`kla_resume_${enrollmentId}`);
+      const versionPrefix = launchUrl.substring(0, launchUrl.lastIndexOf("/") + 1);
+      if (saved && saved.startsWith(versionPrefix)) return saved;
+    }
+    return launchUrl;
+  });
+
   // On mount, call the launch API to record startedAt / increment attempts
   useEffect(() => {
     fetch(`/api/enrollments/${enrollmentId}/launch`, { method: "POST" }).catch(() => {});
   }, [enrollmentId]);
 
-  // Listen for KLA_COMPLETE postMessage from the CBT iframe
+  // Blank the iframe on unmount so the browser stops any in-progress speech synthesis
+  useEffect(() => {
+    return () => {
+      if (iframeRef.current) {
+        try { iframeRef.current.contentWindow?.postMessage({ type: "KLA_STOP" }, "*"); } catch {}
+        iframeRef.current.src = "about:blank";
+      }
+    };
+  }, []);
+
+  // Listen for KLA_COMPLETE and KLA_NAVIGATE postMessages from the CBT iframe
   const handleMessage = useCallback(
     async (event: MessageEvent) => {
+      // Save resume position whenever the CBT navigates to a new page
+      if (event.data?.type === "KLA_NAVIGATE" && event.data.url) {
+        localStorage.setItem(`kla_resume_${enrollmentId}`, event.data.url);
+        return;
+      }
+
       if (event.data?.type !== "KLA_COMPLETE") return;
       if (recordedRef.current) return; // only record once
       recordedRef.current = true;
@@ -52,6 +80,8 @@ export function LaunchClient({ enrollmentId, courseId, courseTitle, launchUrl, c
             questions: event.data.questions ?? undefined,
           }),
         });
+        // Clear resume position — course is done
+        localStorage.removeItem(`kla_resume_${enrollmentId}`);
       } catch {
         // Non-fatal: we've already updated the UI
       }
@@ -74,7 +104,13 @@ export function LaunchClient({ enrollmentId, courseId, courseTitle, launchUrl, c
       {/* narrow top bar */}
       <div className="flex h-10 shrink-0 items-center justify-between bg-[#001245] px-4">
         <button
-          onClick={() => router.push("/my-courses")}
+          onClick={() => {
+            if (iframeRef.current) {
+              try { iframeRef.current.contentWindow?.postMessage({ type: "KLA_STOP" }, "*"); } catch {}
+              iframeRef.current.src = "about:blank";
+            }
+            router.push("/my-courses");
+          }}
           className="flex items-center gap-1.5 text-xs text-white/60 hover:text-white transition-colors"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
@@ -94,7 +130,7 @@ export function LaunchClient({ enrollmentId, courseId, courseTitle, launchUrl, c
 
         <iframe
           ref={iframeRef}
-          src={launchUrl}
+          src={activeSrc}
           className="h-full w-full border-0"
           title={courseTitle}
           onLoad={() => setState((s) => (s === "loading" ? "running" : s))}
@@ -133,24 +169,34 @@ export function LaunchClient({ enrollmentId, courseId, courseTitle, launchUrl, c
                 <Button
                   variant="outline"
                   className="border-white/20 text-white/70 hover:text-white"
-                  onClick={() => router.push("/my-courses")}
+                  onClick={() => {
+                    if (iframeRef.current) {
+                      try { iframeRef.current.contentWindow?.postMessage({ type: "KLA_STOP" }, "*"); } catch {}
+                      iframeRef.current.src = "about:blank";
+                    }
+                    router.push("/my-courses");
+                  }}
                 >
                   My Courses
                 </Button>
-                {state === "failed" && (
-                  <Button
-                    className="bg-[#cc3d00] text-white hover:bg-[#b33400]"
-                    onClick={() => {
-                      recordedRef.current = false;
-                      setState("loading");
-                      if (iframeRef.current) {
-                        iframeRef.current.src = launchUrl;
-                      }
-                    }}
-                  >
-                    Retake
-                  </Button>
-                )}
+                <Button
+                  className={
+                    state === "passed"
+                      ? "bg-emerald-700 text-white hover:bg-emerald-600"
+                      : "bg-[#cc3d00] text-white hover:bg-[#b33400]"
+                  }
+                  onClick={async () => {
+                    await fetch(`/api/enrollments/${enrollmentId}/reset`, { method: "POST" });
+                    localStorage.removeItem(`kla_resume_${enrollmentId}`);
+                    recordedRef.current = false;
+                    setState("loading");
+                    if (iframeRef.current) {
+                      iframeRef.current.src = launchUrl;
+                    }
+                  }}
+                >
+                  Retake
+                </Button>
               </div>
             </div>
           </div>

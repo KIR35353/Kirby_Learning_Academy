@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import type { Session } from "next-auth";
 import { db } from "@/lib/db";
 import { indexCourse, deindexCourse } from "@/lib/meili";
+import { listObjects, deleteObject } from "@/lib/s3";
 import { z } from "zod";
 
 const updateSchema = z.object({
@@ -108,7 +109,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   return NextResponse.json(course);
 }
 
-// DELETE /api/admin/courses/[id] — archive (soft delete)
+// DELETE /api/admin/courses/[id]
+// Default: soft-delete (archive). Add ?permanent=true for hard delete (SUPER_ADMIN only).
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -118,9 +120,57 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   if (!canDelete) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { id } = await params;
-  const existing = await db.course.findFirst({ where: { id, tenantId: session.user.tenantId } });
+  const existing = await db.course.findFirst({
+    where: { id, tenantId: session.user.tenantId },
+    include: { versions: { select: { s3Prefix: true } } },
+  });
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
+  const permanent = req.nextUrl.searchParams.get("permanent") === "true";
+
+  if (permanent) {
+    // Hard delete — SUPER_ADMIN only
+    if (!roles.includes("SUPER_ADMIN")) {
+      return NextResponse.json({ error: "Permanent delete requires SUPER_ADMIN" }, { status: 403 });
+    }
+
+    // 1. Remove from search index
+    await deindexCourse(id).catch(() => {});
+
+    // 2. Cascade-delete all DB dependants (order matters: stats → enrollments → rest)
+    const enrollmentIds = (
+      await db.enrollment.findMany({ where: { courseId: id }, select: { id: true } })
+    ).map((e) => e.id);
+
+    await db.courseCompletionStats.deleteMany({ where: { enrollmentId: { in: enrollmentIds } } });
+    await db.enrollment.deleteMany({ where: { courseId: id } });
+    await db.courseCompletionHistory.deleteMany({ where: { courseId: id } });
+    await db.learningPathCourse.deleteMany({ where: { courseId: id } });
+    await db.courseSkill.deleteMany({ where: { courseId: id } });
+    await db.courseRating.deleteMany({ where: { courseId: id } });
+    await db.forumCategory.deleteMany({ where: { courseId: id } }); // cascades threads + posts
+    await db.standaloneAssessment.updateMany({
+      where: { remediationCourseId: id },
+      data:  { remediationCourseId: null },
+    });
+    await db.certification.updateMany({
+      where: { renewalCourseId: id },
+      data:  { renewalCourseId: null },
+    });
+
+    // 3. Delete the course record (cascades CourseVersion, CourseTag, CourseLanguage)
+    await db.course.delete({ where: { id } });
+
+    // 4. Delete S3 files for every version (non-fatal)
+    for (const v of existing.versions) {
+      const keys = await listObjects(v.s3Prefix).catch(() => [] as string[]);
+      await Promise.allSettled(keys.map((k) => deleteObject(k)));
+    }
+
+    return new NextResponse(null, { status: 204 });
+  }
+
+  // Soft delete — archive
   await db.course.update({
     where: { id },
     data: { status: "ARCHIVED", archivedAt: new Date() },

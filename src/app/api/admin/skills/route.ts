@@ -77,7 +77,12 @@ export async function POST(req: NextRequest) {
       categoryId: parsed.data.categoryId ?? null,
       levelLabels: parsed.data.levelLabels,
     },
-    include: { category: { select: { id: true, name: true } }, _count: { select: { userSkills: true, roleRequirements: true, courseSkills: true } } },
+    include: {
+      category: { select: { id: true, name: true } },
+      courseSkills: { include: { course: { select: { id: true, title: true } } } },
+      roleRequirements: { include: { jobTitle: { select: { id: true, name: true } } } },
+      _count: { select: { userSkills: true } },
+    },
   });
   return NextResponse.json(skill, { status: 201 });
 }

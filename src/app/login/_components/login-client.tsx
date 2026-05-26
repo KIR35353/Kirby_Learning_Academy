@@ -4,6 +4,7 @@ import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import Image from "next/image";
+import { loginWithCredentials } from "../actions";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -29,7 +30,10 @@ function LoginForm({ authMode }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") ?? "/";
-  const [serverError, setServerError] = useState<string | null>(null);
+  const urlError = searchParams.get("error");
+  const [serverError, setServerError] = useState<string | null>(
+    urlError ? "Invalid email or password. Please try again." : null
+  );
   const [ssoLoading, setSsoLoading] = useState(false);
 
   const showCredentials = authMode === "credentials" || authMode === "both";
@@ -45,18 +49,19 @@ function LoginForm({ authMode }: Props) {
 
   async function onSubmit(values: LoginFormValues) {
     setServerError(null);
-    const result = await signIn("credentials", {
-      email: values.email,
-      password: values.password,
-      redirect: false,
-    });
+    const errorType = await loginWithCredentials(
+      values.email,
+      values.password,
+      callbackUrl,
+    );
 
-    if (result?.error) {
+    if (errorType) {
       setServerError("Invalid email or password. Please try again.");
       return;
     }
 
-    router.push(callbackUrl);
+    // If no error is returned, Next.js has handled the redirect.
+    // router.refresh() is a no-op fallback in case the redirect didn't fire.
     router.refresh();
   }
 

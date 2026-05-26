@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 
 function isAdmin(session: Session | null): boolean {
   const roles = session?.user?.roles ?? [];
-  return roles.some((r) => ["SUPER_ADMIN", "TENANT_ADMIN", "COMPLIANCE_OFFICER", "MANAGER"].includes(r));
+  return roles.some((r) => ["SUPER_ADMIN", "TENANT_ADMIN", "MANAGER"].includes(r));
 }
 
 // GET /api/reports/overview

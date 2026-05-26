@@ -48,6 +48,15 @@ const nextConfig: NextConfig = {
 
   // Hide the Next.js dev toolbar (N icon)
   devIndicators: false,
+
+  // Allow next/image to load thumbnails from MinIO (dev) and S3/CDN (prod)
+  images: {
+    remotePatterns: [
+      { protocol: "http",  hostname: "localhost", port: "9000", pathname: "/**" },
+      { protocol: "https", hostname: "*.amazonaws.com",         pathname: "/**" },
+      { protocol: "https", hostname: "*.cloudfront.net",        pathname: "/**" },
+    ],
+  },
 };
 
 // ── Sentry build-time config (disabled when no DSN is set) ───────────────────

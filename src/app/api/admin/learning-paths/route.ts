@@ -13,8 +13,13 @@ const createSchema = z.object({
   title: z.string().min(1).max(200),
   description: z.string().optional(),
   isActive: z.boolean().default(true),
-  // ordered course ids
-  courseIds: z.array(z.string()).default([]),
+  courses: z.array(
+    z.object({
+      courseId: z.string(),
+      isRequired: z.boolean().default(true),
+      prerequisiteCourseId: z.string().nullable().optional(),
+    })
+  ).default([]),
 });
 
 // GET /api/admin/learning-paths
@@ -48,7 +53,7 @@ export async function POST(req: NextRequest) {
   const parsed = createSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
-  const { title, description, isActive, courseIds } = parsed.data;
+  const { title, description, isActive, courses } = parsed.data;
 
   const path = await db.learningPath.create({
     data: {
@@ -57,13 +62,18 @@ export async function POST(req: NextRequest) {
       description,
       isActive,
       courses: {
-        create: courseIds.map((courseId, i) => ({
-          courseId,
+        create: courses.map((c, i) => ({
+          courseId: c.courseId,
           order: i,
+          isRequired: c.isRequired,
+          prerequisiteCourseId: c.prerequisiteCourseId ?? null,
         })),
       },
     },
-    include: { courses: { include: { course: true } } },
+    include: {
+      courses: { orderBy: { order: "asc" }, include: { course: true } },
+      _count: { select: { curricula: true } },
+    },
   });
 
   return NextResponse.json(path, { status: 201 });

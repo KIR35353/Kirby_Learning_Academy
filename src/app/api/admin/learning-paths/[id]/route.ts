@@ -84,7 +84,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const updated = await db.learningPath.findUnique({
     where: { id },
-    include: { courses: { orderBy: { order: "asc" }, include: { course: true } } },
+    include: {
+      courses: { orderBy: { order: "asc" }, include: { course: true } },
+      _count: { select: { curricula: true } },
+    },
   });
   return NextResponse.json(updated);
 }

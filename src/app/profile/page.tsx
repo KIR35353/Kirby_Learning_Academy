@@ -12,11 +12,9 @@ export const metadata = { title: "My Profile" };
 const ROLE_LABELS: Record<string, string> = {
   SUPER_ADMIN: "Super Admin",
   TENANT_ADMIN: "Admin",
-  COMPLIANCE_OFFICER: "Compliance Officer",
   MANAGER: "Manager",
   INSTRUCTOR: "Instructor",
-  EMPLOYEE: "Employee",
-  CONTRACTOR: "Contractor",
+  STUDENT: "Student",
 };
 
 export default async function ProfilePage() {

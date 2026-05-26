@@ -15,11 +15,9 @@ const db = new PrismaClient({ adapter } as ConstructorParameters<typeof PrismaCl
 const ROLES = [
   { name: "SUPER_ADMIN", description: "Full platform access across all tenants" },
   { name: "TENANT_ADMIN", description: "Admin for a single business unit" },
-  { name: "COMPLIANCE_OFFICER", description: "Read/write compliance records and reports" },
   { name: "MANAGER", description: "Assign courses and view team reports" },
   { name: "INSTRUCTOR", description: "Create and manage courses" },
-  { name: "EMPLOYEE", description: "Enroll in and complete courses" },
-  { name: "CONTRACTOR", description: "Restricted catalog access" },
+  { name: "STUDENT", description: "Enroll in and complete courses" },
 ];
 
 // Helper to add days to a date
@@ -43,8 +41,8 @@ async function main() {
   // ── 2. Default tenant ─────────────────────────────────────────────────────
   const tenant = await db.tenant.upsert({
     where: { slug: "kirby-corp" },
-    update: {},
-    create: { name: "Kirby Corporation", slug: "kirby-corp" },
+    update: { domain: "kirbycorp.com" },
+    create: { name: "Kirby Corporation", slug: "kirby-corp", domain: "kirbycorp.com" },
   });
   console.log(`✔  Tenant: ${tenant.name}`);
 
@@ -145,19 +143,19 @@ async function main() {
 
   const demoUserDefs = [
     { email: "john.smith@kirbycorp.com",    name: "John Smith",       role: "MANAGER",            dept: "Marine Operations",       job: "Marine Officer",          location: "Houston, TX HQ"  },
-    { email: "sarah.jones@kirbycorp.com",   name: "Sarah Jones",      role: "COMPLIANCE_OFFICER", dept: "Safety & Compliance",     job: "Compliance Analyst",      location: "Houston, TX HQ"  },
+    { email: "sarah.jones@kirbycorp.com",   name: "Sarah Jones",      role: "MANAGER",            dept: "Safety & Compliance",     job: "Compliance Analyst",      location: "Houston, TX HQ"  },
     { email: "mike.wilson@kirbycorp.com",   name: "Mike Wilson",      role: "INSTRUCTOR",         dept: "Marine Operations",       job: "Marine Officer",          location: "New Orleans, LA" },
-    { email: "emily.chen@kirbycorp.com",    name: "Emily Chen",       role: "EMPLOYEE",           dept: "Marine Operations",       job: "Deckhand",                location: "Houston, TX HQ"  },
-    { email: "carlos.martinez@kirbycorp.com", name: "Carlos Martinez", role: "EMPLOYEE",          dept: "Distribution & Services", job: "Distribution Coordinator", location: "Tampa, FL"      },
-    { email: "lisa.taylor@kirbycorp.com",   name: "Lisa Taylor",      role: "EMPLOYEE",           dept: "Marine Operations",       job: "Deckhand",                location: "New Orleans, LA" },
-    { email: "david.brown@kirbycorp.com",   name: "David Brown",      role: "EMPLOYEE",           dept: "Information Technology",  job: "IT Specialist",           location: "Houston, TX HQ"  },
-    { email: "jessica.davis@kirbycorp.com", name: "Jessica Davis",    role: "EMPLOYEE",           dept: "Human Resources",         job: "HR Manager",              location: "Houston, TX HQ"  },
-    { email: "robert.johnson@kirbycorp.com",name: "Robert Johnson",   role: "CONTRACTOR",         dept: "Marine Operations",       job: "Deckhand",                location: "Beaumont, TX",   isContractor: true },
-    { email: "thomas.williams@kirbycorp.com",name:"Thomas Williams",  role: "EMPLOYEE",           dept: "Safety & Compliance",     job: "Safety Inspector",        location: "Port Arthur, TX" },
-    { email: "jennifer.miller@kirbycorp.com",name:"Jennifer Miller",  role: "EMPLOYEE",           dept: "Engineering",             job: "Engineer",                location: "Houston, TX HQ"  },
+    { email: "emily.chen@kirbycorp.com",    name: "Emily Chen",       role: "STUDENT",            dept: "Marine Operations",       job: "Deckhand",                location: "Houston, TX HQ"  },
+    { email: "carlos.martinez@kirbycorp.com", name: "Carlos Martinez", role: "STUDENT",           dept: "Distribution & Services", job: "Distribution Coordinator", location: "Tampa, FL"      },
+    { email: "lisa.taylor@kirbycorp.com",   name: "Lisa Taylor",      role: "STUDENT",            dept: "Marine Operations",       job: "Deckhand",                location: "New Orleans, LA" },
+    { email: "david.brown@kirbycorp.com",   name: "David Brown",      role: "STUDENT",            dept: "Information Technology",  job: "IT Specialist",           location: "Houston, TX HQ"  },
+    { email: "jessica.davis@kirbycorp.com", name: "Jessica Davis",    role: "STUDENT",            dept: "Human Resources",         job: "HR Manager",              location: "Houston, TX HQ"  },
+    { email: "robert.johnson@kirbycorp.com",name: "Robert Johnson",   role: "STUDENT",            dept: "Marine Operations",       job: "Deckhand",                location: "Beaumont, TX",   isContractor: true },
+    { email: "thomas.williams@kirbycorp.com",name:"Thomas Williams",  role: "STUDENT",            dept: "Safety & Compliance",     job: "Safety Inspector",        location: "Port Arthur, TX" },
+    { email: "jennifer.miller@kirbycorp.com",name:"Jennifer Miller",  role: "STUDENT",            dept: "Engineering",             job: "Engineer",                location: "Houston, TX HQ"  },
   ] as const;
 
-  const users: Record<string, { id: string; name: string }> = { [admin.email]: admin };
+  const users: Record<string, { id: string; name: string | null }> = { [admin.email]: admin };
   for (const u of demoUserDefs) {
     const roleRec = await db.role.findUnique({ where: { name: u.role } });
     const created = await db.user.upsert({
@@ -1001,7 +999,7 @@ async function main() {
         userId,
         title: d.courseTitle,
         issuerName: "Kirby Learning Academy",
-        recipientName: user.name,
+        recipientName: user.name ?? "",
         issuedAt,
         expiresAt: addDays(issuedAt, d.validForDays),
       },

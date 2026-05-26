@@ -16,6 +16,7 @@ interface ImportResult {
   id: string;
   title: string;
   versionNumber: number;
+  updated: boolean;
 }
 
 interface Props {
@@ -27,12 +28,13 @@ interface Props {
 type State = "idle" | "uploading" | "success" | "error";
 
 export function ImportDialog({ open, onClose, onImported }: Props) {
-  const [file, setFile]         = useState<File | null>(null);
-  const [state, setState]       = useState<State>("idle");
-  const [progress, setProgress] = useState(0);
-  const [error, setError]       = useState<string | null>(null);
-  const [result, setResult]     = useState<ImportResult | null>(null);
-  const [dragging, setDragging] = useState(false);
+  const [file, setFile]           = useState<File | null>(null);
+  const [state, setState]         = useState<State>("idle");
+  const [progress, setProgress]   = useState(0);
+  const [error, setError]         = useState<string | null>(null);
+  const [result, setResult]       = useState<ImportResult | null>(null);
+  const [dragging, setDragging]   = useState(false);
+  const [autoPublish, setAutoPublish] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
@@ -61,12 +63,13 @@ export function ImportDialog({ open, onClose, onImported }: Props) {
         };
         xhr.onload = () => {
           setProgress(100);
-          if (xhr.status === 201) {
+          if (xhr.status === 200 || xhr.status === 201) {
             const data = JSON.parse(xhr.responseText);
             resolve({
               id: data.course.id,
               title: data.course.title,
               versionNumber: data.version.versionNumber,
+              updated: data.updated === true,
             });
           } else {
             try {
@@ -79,6 +82,15 @@ export function ImportDialog({ open, onClose, onImported }: Props) {
         xhr.onerror = () => reject(new Error("Network error"));
         xhr.send(form);
       });
+
+      // Optionally publish immediately
+      if (autoPublish) {
+        await fetch(`/api/admin/courses/${imported.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: "PUBLISHED" }),
+        });
+      }
 
       setResult(imported);
       setState("success");
@@ -96,6 +108,7 @@ export function ImportDialog({ open, onClose, onImported }: Props) {
     setError(null);
     setResult(null);
     setProgress(0);
+    setAutoPublish(false);
     onClose();
   }
 
@@ -116,9 +129,12 @@ export function ImportDialog({ open, onClose, onImported }: Props) {
             <div className="flex flex-col items-center gap-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-6 text-center">
               <CheckCircle2 className="h-10 w-10 text-emerald-400" />
               <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-emerald-400/70">
+                  {result.updated ? "Course Updated" : "Course Imported"}
+                </p>
                 <p className="font-semibold text-emerald-300">{result.title}</p>
                 <p className="mt-1 text-xs text-white/50">
-                  Version {result.versionNumber} uploaded · Status: Draft
+                  Version {result.versionNumber} · Status: {autoPublish ? "Published" : "Draft"}
                 </p>
               </div>
               <div className="flex gap-2">
@@ -205,6 +221,21 @@ export function ImportDialog({ open, onClose, onImported }: Props) {
                   {error}
                 </div>
               )}
+
+              {/* ── Publish toggle ───────────────────────────────────── */}
+              <label className="flex items-center gap-3 cursor-pointer select-none">
+                <div
+                  role="checkbox"
+                  aria-checked={autoPublish}
+                  onClick={() => setAutoPublish((v) => !v)}
+                  className={`h-5 w-5 rounded border flex items-center justify-center transition-colors ${
+                    autoPublish ? "bg-[#cc3d00] border-[#cc3d00]" : "border-white/30 bg-transparent"
+                  }`}
+                >
+                  {autoPublish && <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 12 12"><path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                </div>
+                <span className="text-sm text-white/70">Publish immediately after import</span>
+              </label>
 
               {/* ── What gets auto-populated ──────────────────────────── */}
               {!file && state === "idle" && (

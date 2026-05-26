@@ -27,6 +27,11 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 const region = process.env.S3_REGION ?? process.env.AWS_REGION ?? "us-east-1";
 const endpoint = process.env.S3_ENDPOINT; // set for MinIO; omit for real AWS
+// Public-facing base URL for browser-accessible file links (thumbnails, launch
+// URLs, etc.).  Defaults to S3_ENDPOINT when not set (fine for local dev).
+// In production set this to the externally-routable MinIO/S3 URL, e.g.
+//   S3_PUBLIC_URL=https://hanson01.eastus.cloudapp.azure.com
+const publicEndpoint = process.env.S3_PUBLIC_URL ?? endpoint;
 
 export const s3 = new S3Client({
   region,
@@ -104,9 +109,20 @@ export async function listObjects(prefix: string): Promise<string[]> {
  * For AWS:   https://bucket.s3.region.amazonaws.com/prefix/
  */
 export function getCourseBaseUrl(s3KeyPrefix: string): string {
-  if (endpoint) {
-    return `${endpoint}/${S3_BUCKET}/${s3KeyPrefix}`;
+  if (publicEndpoint) {
+    return `${publicEndpoint}/${S3_BUCKET}/${s3KeyPrefix}`;
   }
   const region_ = region;
   return `https://${S3_BUCKET}.s3.${region_}.amazonaws.com/${s3KeyPrefix}`;
+}
+
+/**
+ * Build the public URL for a single file key.
+ * Used for branding assets (logos, favicons, banners) stored under tenants/.
+ */
+export function getPublicFileUrl(key: string): string {
+  if (publicEndpoint) {
+    return `${publicEndpoint}/${S3_BUCKET}/${key}`;
+  }
+  return `https://${S3_BUCKET}.s3.${region}.amazonaws.com/${key}`;
 }

@@ -68,7 +68,7 @@ export async function GET(req: NextRequest) {
       db.course.findMany({
         where,
         include: { tags: true },
-        orderBy: { publishedAt: "desc" },
+        orderBy: { createdAt: "desc" },
         skip: (page - 1) * limit,
         take: limit,
       }),
@@ -84,7 +84,7 @@ export async function GET(req: NextRequest) {
       duration: c.duration,
       thumbnailUrl: c.thumbnailUrl,
       targetAudience: c.targetAudience,
-      publishedAt: c.publishedAt?.toISOString() ?? null,
+      publishedAt: c.createdAt?.toISOString() ?? null,
     }));
 
     return NextResponse.json({ hits, total, page, limit, fallback: true });

@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
 
   // Managers/admins can query any user in their tenant; employees can only query themselves
   const roles = session.user.roles ?? [];
-  const isPrivileged = roles.some((r) => ["SUPER_ADMIN", "TENANT_ADMIN", "INSTRUCTOR", "COMPLIANCE_OFFICER", "MANAGER"].includes(r));
+  const isPrivileged = roles.some((r) => ["SUPER_ADMIN", "TENANT_ADMIN", "INSTRUCTOR", "MANAGER"].includes(r));
   if (targetUserId !== session.user.id && !isPrivileged)
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 

@@ -79,6 +79,26 @@ if (Test-Port 7700) {
         & $exe --master-key $key --db-path $data 2>&1
     } -ArgumentList $MeiliExe, $MeiliData, "kla_meili_dev_key"
     Write-Host "  Meilisearch started  -> :7700  (job $($meiliJob.Id))" -ForegroundColor Green
+
+    # Wait up to 8 s for Meilisearch to be ready
+    $meiliReady = $false
+    for ($i = 0; $i -lt 16; $i++) {
+        Start-Sleep -Milliseconds 500
+        try {
+            $r = Invoke-WebRequest -Uri "http://localhost:7700/health" -UseBasicParsing -TimeoutSec 1 -ErrorAction Stop
+            if ($r.StatusCode -eq 200) { $meiliReady = $true; break }
+        } catch { }
+    }
+    if (-not $meiliReady) {
+        Write-Host "  WARNING: Meilisearch did not respond within 8 s" -ForegroundColor Yellow
+    }
+}
+
+# ── Reindex courses into Meilisearch ─────────────────────────────────────────
+try {
+    node "$Root\scripts\reindex-courses.mjs" 2>&1 | ForEach-Object { Write-Host "  $_" -ForegroundColor DarkGray }
+} catch {
+    Write-Host "  WARNING: Course reindex failed (catalog may be empty): $_" -ForegroundColor Yellow
 }
 
 # ── Ensure Prisma client is generated ────────────────────────────────────────

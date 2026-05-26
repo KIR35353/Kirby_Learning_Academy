@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 
 function isAdmin(session: Session | null): boolean {
   const roles = session?.user?.roles ?? [];
-  return roles.some((r) => ["SUPER_ADMIN", "TENANT_ADMIN", "COMPLIANCE_OFFICER", "MANAGER"].includes(r));
+  return roles.some((r) => ["SUPER_ADMIN", "TENANT_ADMIN", "MANAGER"].includes(r));
 }
 
 // GET /api/reports/course-effectiveness
@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
     select: {
       id: true, title: true, status: true,
       enrollments: {
-        select: { status: true, score: true, passed: true },
+        select: { status: true, score: true, passed: true, startedAt: true, completedAt: true },
       },
     },
     orderBy: { title: "asc" },
@@ -37,12 +37,19 @@ export async function GET(req: NextRequest) {
     const avgScore = scored.length > 0
       ? Math.round(scored.reduce((a, e) => a + (e.score ?? 0), 0) / scored.length * 10) / 10
       : null;
+    const timed = c.enrollments.filter(
+      (e) => e.startedAt !== null && e.completedAt !== null && ["PASSED", "FAILED", "COMPLETED"].includes(e.status),
+    );
+    const avgTimeMinutes = timed.length > 0
+      ? Math.round(timed.reduce((a, e) => a + (e.completedAt!.getTime() - e.startedAt!.getTime()), 0) / timed.length / 60000)
+      : null;
     return {
       id: c.id, title: c.title, status: c.status,
       totalEnrollments: total,
       completionRate: total > 0 ? Math.round(completed / total * 100) : 0,
       passRate: completed > 0 ? Math.round(passed / completed * 100) : 0,
       avgScore,
+      avgTimeMinutes,
     };
   });
 

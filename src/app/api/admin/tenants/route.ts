@@ -30,7 +30,10 @@ export async function GET() {
 const createSchema = z.object({
   name: z.string().min(1).max(100),
   slug: z.string().min(1).max(50).regex(/^[a-z0-9-]+$/, "Slug must be lowercase letters, numbers, and hyphens only"),
+  domain: z.string().regex(/^[a-z0-9][a-z0-9.-]*\.[a-z]{2,}$/, "Invalid domain format").optional(),
   logoUrl: z.string().url().optional(),
+  departments: z.array(z.string().min(1)).optional(),
+  locations: z.array(z.string().min(1)).optional(),
 });
 
 export async function POST(request: Request) {
@@ -44,6 +47,29 @@ export async function POST(request: Request) {
   const existing = await db.tenant.findUnique({ where: { slug: parsed.data.slug } });
   if (existing) return NextResponse.json({ error: "Slug already in use" }, { status: 409 });
 
-  const tenant = await db.tenant.create({ data: parsed.data });
+  if (parsed.data.domain) {
+    const domainTaken = await db.tenant.findUnique({ where: { domain: parsed.data.domain } });
+    if (domainTaken) return NextResponse.json({ error: "Domain already in use" }, { status: 409 });
+  }
+
+  const { departments, locations, ...tenantData } = parsed.data;
+
+  const tenant = await db.$transaction(async (tx) => {
+    const created = await tx.tenant.create({ data: tenantData });
+    if (departments?.length) {
+      await tx.department.createMany({
+        data: departments.map((name) => ({ name: name.trim(), tenantId: created.id })),
+        skipDuplicates: true,
+      });
+    }
+    if (locations?.length) {
+      await tx.location.createMany({
+        data: locations.map((name) => ({ name: name.trim(), tenantId: created.id })),
+        skipDuplicates: true,
+      });
+    }
+    return created;
+  });
+
   return NextResponse.json(tenant, { status: 201 });
 }

@@ -14,6 +14,8 @@ import {
   Clock,
   Archive,
   Eye,
+  RefreshCw,
+  Trash2,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -45,6 +47,8 @@ export function CoursesClient({ initialCourses }: Props) {
   const [createOpen, setCreateOpen]   = useState(false);
   const [editCourse, setEditCourse]   = useState<CourseRow | null>(null);
   const [uploadCourse, setUploadCourse] = useState<CourseRow | null>(null);
+  const [reindexing, setReindexing]   = useState(false);
+  const [reindexMsg, setReindexMsg]   = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
   const filtered = courses.filter((c) => {
@@ -74,6 +78,34 @@ export function CoursesClient({ initialCourses }: Props) {
     if (!confirm(`Archive "${course.title}"? It will be removed from the catalog.`)) return;
     await fetch(`/api/admin/courses/${course.id}`, { method: "DELETE" });
     startTransition(() => { refresh(); });
+  }
+
+  async function handlePermanentDelete(course: CourseRow) {
+    if (!confirm(
+      `Permanently delete "${course.title}"?\n\nThis will erase the course record, all enrollments, completion history, and every file in storage.\n\nThis CANNOT be undone.`
+    )) return;
+    const res = await fetch(`/api/admin/courses/${course.id}?permanent=true`, { method: "DELETE" });
+    if (!res.ok && res.status !== 204) {
+      const data = await res.json().catch(() => ({}));
+      alert(`Delete failed: ${(data as { error?: string }).error ?? res.status}`);
+      return;
+    }
+    startTransition(() => { refresh(); });
+  }
+
+  async function handleReindex() {
+    setReindexing(true);
+    setReindexMsg(null);
+    try {
+      const res = await fetch("/api/admin/courses/reindex", { method: "POST" });
+      const data = await res.json();
+      setReindexMsg(res.ok ? `✓ ${data.message}` : `✗ ${data.error ?? "Reindex failed"}`);
+    } catch {
+      setReindexMsg("✗ Could not reach server");
+    } finally {
+      setReindexing(false);
+      setTimeout(() => setReindexMsg(null), 5000);
+    }
   }
 
   return (
@@ -106,7 +138,23 @@ export function CoursesClient({ initialCourses }: Props) {
           ))}
         </div>
 
-        <div className="ml-auto flex gap-2">
+        <div className="ml-auto flex items-center gap-2">
+          {reindexMsg && (
+            <span className={`text-xs ${reindexMsg.startsWith("✓") ? "text-emerald-400" : "text-red-400"}`}>
+              {reindexMsg}
+            </span>
+          )}
+          <Button
+            size="sm"
+            variant="outline"
+            className="border-white/20 text-white/70 hover:bg-white/10 hover:text-white"
+            onClick={handleReindex}
+            disabled={reindexing}
+            title="Rebuild Meilisearch index from published courses"
+          >
+            <RefreshCw className={`mr-1.5 h-4 w-4 ${reindexing ? "animate-spin" : ""}`} />
+            Reindex
+          </Button>
           <Button
             size="sm"
             variant="outline"
@@ -245,6 +293,18 @@ export function CoursesClient({ initialCourses }: Props) {
                               Archive
                             </DropdownMenuItem>
                           )}
+                          {course.status === "ARCHIVED" && (
+                            <>
+                              <div className="my-1 h-px bg-white/10" />
+                              <DropdownMenuItem
+                                className="text-red-500 focus:text-red-400 focus:bg-red-950/40"
+                                onClick={() => handlePermanentDelete(course)}
+                              >
+                                <Trash2 className="mr-2 h-3.5 w-3.5" />
+                                Delete permanently
+                              </DropdownMenuItem>
+                            </>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </td>
@@ -260,7 +320,7 @@ export function CoursesClient({ initialCourses }: Props) {
       <ImportDialog
         open={importOpen}
         onClose={() => setImportOpen(false)}
-        onImported={() => { setImportOpen(false); refresh(); }}
+        onImported={() => { refresh(); }}
       />
 
       <CourseDialog
