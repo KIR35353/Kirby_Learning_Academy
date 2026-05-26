@@ -13,6 +13,7 @@ export default async function HomePage() {
   if (!session?.user) redirect("/login");
 
   const displayName = session.user.name ?? session.user.email ?? "there";
+  const appName = (session.user as { appName?: string | null }).appName ?? "Kirby Learning Academy";
 
   // Real enrollment stats
   const [enrollments, dueSoonCount, completedAll, certCount] = await Promise.all([
@@ -75,7 +76,7 @@ export default async function HomePage() {
           {/* welcome banner */}
           <div className="mb-8 rounded-xl border border-white/10 bg-white/5 px-6 py-5">
             <p className="text-xs font-semibold uppercase tracking-widest text-[#cc3d00]">
-              Kirby Learning Academy
+              {appName}
             </p>
             <h2 className="mt-1 text-2xl font-bold text-white">
               Welcome back, {displayName}
