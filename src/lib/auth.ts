@@ -30,7 +30,7 @@ const credentialsProvider = Credentials({
       where: { email: credentials.email as string },
       include: {
         roles: { include: { role: true } },
-        tenant: { select: { logoUrl: true } },
+        tenant: { select: { logoUrl: true, appName: true, supportEmail: true } },
       },
     });
 
@@ -53,6 +53,8 @@ const credentialsProvider = Credentials({
        displayName: user.displayName || user.name || user.email,
       image: user.avatarUrl,
       logoUrl: user.tenant?.logoUrl ?? null,
+      appName: user.tenant?.appName ?? null,
+      supportEmail: user.tenant?.supportEmail ?? null,
       tenantId: user.tenantId,
       isContractor: user.isContractor,
       roles: rolesArray,
@@ -163,6 +165,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.id = user.id;
         token.tenantId = (user as { tenantId?: string }).tenantId;
         token.logoUrl = (user as { logoUrl?: string | null }).logoUrl ?? undefined;
+        token.appName = (user as { appName?: string | null }).appName ?? undefined;
+        token.supportEmail = (user as { supportEmail?: string | null }).supportEmail ?? undefined;
         token.isContractor = (user as { isContractor?: boolean }).isContractor;
         // Ensure roles is always an array of strings
         const userRoles = (user as any).roles;
@@ -182,12 +186,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           where: { id: token.sub },
           include: {
             roles: { include: { role: true } },
-            tenant: { select: { logoUrl: true } },
+            tenant: { select: { logoUrl: true, appName: true, supportEmail: true } },
           },
         });
         if (dbUser) {
           token.tenantId = dbUser.tenantId || ((await getDefaultTenantId()) ?? undefined);
           token.logoUrl = dbUser.tenant?.logoUrl ?? undefined;
+          token.appName = dbUser.tenant?.appName ?? undefined;
+          token.supportEmail = dbUser.tenant?.supportEmail ?? undefined;
           token.isContractor = dbUser.isContractor;
           token.displayName = dbUser.displayName ?? undefined;
           token.name = dbUser.name ?? dbUser.email;
@@ -206,13 +212,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             name: true, 
             email: true,
             roles: { include: { role: true } },
-            tenant: { select: { logoUrl: true } },
+            tenant: { select: { logoUrl: true, appName: true, supportEmail: true } },
           },
         });
         if (dbUser) {
           token.displayName = dbUser.displayName ?? undefined;
           token.name = dbUser.name ?? dbUser.email;
           token.logoUrl = dbUser.tenant?.logoUrl ?? undefined;
+          token.appName = dbUser.tenant?.appName ?? undefined;
+          token.supportEmail = dbUser.tenant?.supportEmail ?? undefined;
           token.roles = dbUser.roles.map((ur: { role: { name: string } }) => ur.role.name);
         }
       }
@@ -228,6 +236,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         u.roles = token.roles;
         u.displayName = token.displayName;
         u.logoUrl = token.logoUrl;
+        u.appName = token.appName;
+        u.supportEmail = token.supportEmail;
       }
       console.log("[session:output]", { displayName: (session.user as any)?.displayName, rolesCount: (session.user as any)?.roles?.length });
       return session;

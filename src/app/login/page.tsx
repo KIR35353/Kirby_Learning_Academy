@@ -38,9 +38,27 @@ async function getLoginBranding(): Promise<LoginBranding | null> {
     : null;
   if (byHost) return byHost;
 
-  // Fall back to the first (or only) tenant — works for single-tenant installs
-  // and for multi-tenant installs where no subdomain/domain match is found.
+  // If host/domain does not resolve a tenant (common on shared VM hostnames),
+  // prefer a tenant that has branding configured.
   return db.tenant.findFirst({
+    where: {
+      OR: [
+        { appName: { not: null } },
+        { supportEmail: { not: null } },
+        { logoUrl: { not: null } },
+        { loginBannerUrl: { not: null } },
+      ],
+    },
+    orderBy: { updatedAt: "desc" },
+    select: {
+      appName: true,
+      logoUrl: true,
+      faviconUrl: true,
+      loginBannerUrl: true,
+      supportEmail: true,
+      updatedAt: true,
+    },
+  }) ?? db.tenant.findFirst({
     orderBy: { createdAt: "asc" },
     select: {
       appName: true,

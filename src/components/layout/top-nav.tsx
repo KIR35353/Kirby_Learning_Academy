@@ -38,10 +38,14 @@ export function TopNav({ pageTitle }: TopNavProps) {
         displayName?: string | null;
         name?: string | null;
         email?: string | null;
+        appName?: string | null;
+        supportEmail?: string | null;
       }
     | undefined;
   const userName  = (sessionUser?.displayName || sessionUser?.name || sessionUser?.email || "User").trim() || "User";
   const userEmail = session?.user?.email ?? "";
+  const appName = sessionUser?.appName ?? "Kirby Learning Academy";
+  const supportEmail = sessionUser?.supportEmail ?? "";
   const userImage = (session?.user as { image?: string } | undefined)?.image ?? undefined;
   const initials  = userName.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2) || "??";
   const [unreadCount, setUnreadCount] = useState(0);
@@ -93,9 +97,16 @@ export function TopNav({ pageTitle }: TopNavProps) {
   return (
     <header className="flex h-16 shrink-0 items-center justify-between border-b border-border bg-white px-6 shadow-sm">
       {/* page title */}
-      <h1 className="truncate text-base font-semibold text-k-navy">
-        {pageTitle ?? "Kirby Learning Academy"}
-      </h1>
+      <div className="min-w-0">
+        <h1 className="truncate text-base font-semibold text-k-navy">
+          {pageTitle ?? appName}
+        </h1>
+        {supportEmail && (
+          <p className="truncate text-xs text-muted-foreground">
+            Support: {supportEmail}
+          </p>
+        )}
+      </div>
 
       <div className="flex items-center gap-3">
         {/* ── Notification Bell ──────────────────────────────────────── */}
@@ -181,6 +192,10 @@ export function TopNav({ pageTitle }: TopNavProps) {
             <div className="px-2 py-1.5 border-b border-border mb-1">
               <p className="text-sm font-semibold truncate">{userName}</p>
               <p className="text-xs text-muted-foreground truncate">{userEmail}</p>
+              <p className="text-xs text-muted-foreground truncate">{appName}</p>
+              {supportEmail && (
+                <p className="text-xs text-muted-foreground truncate">Support: {supportEmail}</p>
+              )}
             </div>
             <DropdownMenuItem className="cursor-pointer" onClick={() => window.location.href = "/profile"}>
               <User className="mr-2 h-4 w-4" /> My Profile
