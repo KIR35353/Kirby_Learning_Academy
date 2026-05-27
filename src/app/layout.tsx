@@ -6,8 +6,10 @@ import { headers } from "next/headers";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { cache } from "react";
 import "./globals.css";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 const inter = Inter({
   variable: "--font-inter",
@@ -15,10 +17,7 @@ const inter = Inter({
   display: "swap",
 });
 
-// ── Per-request cached branding lookup ───────────────────────────────────────
-// React cache() deduplicates across generateMetadata + the layout component
-// within the same request, so only one DB query fires per page load.
-const getTenantBranding = cache(async () => {
+async function getTenantBranding() {
   const session = await auth();
   const tenantId = (session?.user as Record<string, unknown>)?.tenantId as string | undefined;
   if (tenantId) {
@@ -61,7 +60,7 @@ const getTenantBranding = cache(async () => {
       updatedAt: true,
     },
   });
-});
+}
 
 // ── Dynamic metadata (title + favicon) ───────────────────────────────────────
 export async function generateMetadata(): Promise<Metadata> {
