@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import {
@@ -19,15 +19,30 @@ interface ImportResult {
   updated: boolean;
 }
 
+interface TenantOption {
+  id: string;
+  name: string;
+}
+
 interface Props {
   open: boolean;
   onClose: () => void;
   onImported: () => void;
+  isSuperAdmin: boolean;
+  currentTenantId: string;
+  tenants: TenantOption[];
 }
 
 type State = "idle" | "uploading" | "success" | "error";
 
-export function ImportDialog({ open, onClose, onImported }: Props) {
+export function ImportDialog({
+  open,
+  onClose,
+  onImported,
+  isSuperAdmin,
+  currentTenantId,
+  tenants,
+}: Props) {
   const [file, setFile]           = useState<File | null>(null);
   const [state, setState]         = useState<State>("idle");
   const [progress, setProgress]   = useState(0);
@@ -35,7 +50,12 @@ export function ImportDialog({ open, onClose, onImported }: Props) {
   const [result, setResult]       = useState<ImportResult | null>(null);
   const [dragging, setDragging]   = useState(false);
   const [autoPublish, setAutoPublish] = useState(false);
+  const [selectedTenantIds, setSelectedTenantIds] = useState<string[]>([currentTenantId]);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (open) setSelectedTenantIds([currentTenantId]);
+  }, [open, currentTenantId]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -53,6 +73,9 @@ export function ImportDialog({ open, onClose, onImported }: Props) {
 
     const form = new FormData();
     form.append("file", file);
+    if (isSuperAdmin) {
+      form.append("tenantIds", JSON.stringify(Array.from(new Set(selectedTenantIds)).filter(Boolean)));
+    }
 
     try {
       const imported = await new Promise<ImportResult>((resolve, reject) => {
@@ -109,6 +132,7 @@ export function ImportDialog({ open, onClose, onImported }: Props) {
     setResult(null);
     setProgress(0);
     setAutoPublish(false);
+    setSelectedTenantIds([currentTenantId]);
     onClose();
   }
 
@@ -222,6 +246,34 @@ export function ImportDialog({ open, onClose, onImported }: Props) {
                 </div>
               )}
 
+              {isSuperAdmin && (
+                <div className="space-y-2">
+                  <p className="text-sm text-white/70">Tenant Assignment</p>
+                  <div className="max-h-28 space-y-1 overflow-y-auto rounded-md border border-white/10 bg-white/5 p-2">
+                    {tenants.map((tenant) => {
+                      const checked = selectedTenantIds.includes(tenant.id);
+                      return (
+                        <label key={tenant.id} className="flex items-center gap-2 text-sm text-white/80">
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4 accent-[#cc3d00]"
+                            checked={checked}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedTenantIds((prev) => Array.from(new Set([...prev, tenant.id])));
+                              } else {
+                                setSelectedTenantIds((prev) => prev.filter((id) => id !== tenant.id));
+                              }
+                            }}
+                          />
+                          <span>{tenant.name}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {/* ── Publish toggle ───────────────────────────────────── */}
               <label className="flex items-center gap-3 cursor-pointer select-none">
                 <div
@@ -250,7 +302,7 @@ export function ImportDialog({ open, onClose, onImported }: Props) {
 
               <Button
                 onClick={handleImport}
-                disabled={!file || state === "uploading"}
+                disabled={!file || state === "uploading" || (isSuperAdmin && selectedTenantIds.length === 0)}
                 className="w-full bg-[#cc3d00] hover:bg-[#b33400] text-white"
               >
                 {state === "uploading" ? (

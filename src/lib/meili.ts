@@ -30,11 +30,11 @@ export async function initCourseIndex(): Promise<void> {
       "category",
       "targetAudience",
     ],
-    filterableAttributes: ["status", "category", "tags", "tenantId"],
+    filterableAttributes: ["status", "category", "tags", "tenantIds"],
     sortableAttributes: ["publishedAt", "title"],
     displayedAttributes: [
       "id", "title", "description", "category", "tags",
-      "durationMinutes", "status", "thumbnailUrl", "tenantId", "publishedAt",
+      "durationMinutes", "status", "thumbnailUrl", "tenantIds", "publishedAt",
     ],
   });
 }
@@ -42,7 +42,7 @@ export async function initCourseIndex(): Promise<void> {
 /** Upsert a single course document into the Meilisearch index. */
 export async function indexCourse(doc: {
   id: string;
-  tenantId: string;
+  tenantIds: string[];
   title: string;
   description: string | null;
   category: string | null;

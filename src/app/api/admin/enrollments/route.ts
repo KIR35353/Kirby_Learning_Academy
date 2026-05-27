@@ -65,7 +65,10 @@ export async function POST(req: NextRequest) {
   const { courseId, userIds, dueDate } = parsed.data;
 
   const course = await db.course.findFirst({
-    where: { id: courseId, tenantId: session.user.tenantId },
+    where: {
+      id: courseId,
+      courseTenants: { some: { tenantId: session.user.tenantId } },
+    },
     include: { activeVersion: { select: { id: true } } },
   });
   if (!course) return NextResponse.json({ error: "Course not found" }, { status: 404 });

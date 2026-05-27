@@ -34,6 +34,7 @@ export async function POST(req: NextRequest) {
     roles.includes("TENANT_ADMIN") ||
     roles.includes("INSTRUCTOR");
   if (!canImport) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const isSuperAdmin = roles.includes("SUPER_ADMIN");
 
   // ── Parse multipart ──────────────────────────────────────────────────────
   let formData: FormData;
@@ -46,6 +47,28 @@ export async function POST(req: NextRequest) {
   const file = formData.get("file");
   if (!file || typeof file === "string")
     return NextResponse.json({ error: "No file uploaded" }, { status: 400 });
+
+  const rawTenantIds = formData.get("tenantIds");
+  let requestedTenantIds: string[] = [];
+  if (typeof rawTenantIds === "string" && rawTenantIds.trim().length > 0) {
+    try {
+      requestedTenantIds = rawTenantIds.trim().startsWith("[")
+        ? (JSON.parse(rawTenantIds) as string[])
+        : rawTenantIds.split(",").map((t) => t.trim()).filter(Boolean);
+    } catch {
+      return NextResponse.json({ error: "Invalid tenantIds format" }, { status: 400 });
+    }
+  }
+  const selectedTenantIds = isSuperAdmin
+    ? (requestedTenantIds.length > 0 ? Array.from(new Set(requestedTenantIds)) : [session.user.tenantId])
+    : [session.user.tenantId];
+
+  if (isSuperAdmin) {
+    const tenantCount = await db.tenant.count({ where: { id: { in: selectedTenantIds } } });
+    if (tenantCount !== selectedTenantIds.length) {
+      return NextResponse.json({ error: "One or more tenantIds are invalid" }, { status: 400 });
+    }
+  }
 
   const zipBuffer = Buffer.from(await (file as File).arrayBuffer());
   if (zipBuffer.length > MAX_ZIP_BYTES)
@@ -85,9 +108,13 @@ export async function POST(req: NextRequest) {
   // ── Upsert: update existing course if GUID matches, else create ──────────
   const existingCourse = meta.externalId
     ? await db.course.findFirst({
-        where: { tenantId: session.user.tenantId!, externalId: meta.externalId },
+        where: {
+          externalId: meta.externalId,
+          courseTenants: { some: { tenantId: { in: selectedTenantIds } } },
+        },
         include: {
           tags: true,
+          courseTenants: { select: { tenantId: true } },
           activeVersion: { select: { versionNumber: true } },
           _count: { select: { versions: true } },
         },
@@ -114,9 +141,20 @@ export async function POST(req: NextRequest) {
         isContractorVisible: meta.contractorVisible,
         complianceTags:      meta.complianceTags,
         tags: { create: meta.tags.map((tag) => ({ tag })) },
+        ...(isSuperAdmin
+          ? {
+              courseTenants: {
+                connectOrCreate: selectedTenantIds.map((tenantId) => ({
+                  where: { courseId_tenantId: { courseId: existingCourse.id, tenantId } },
+                  create: { tenantId, assignedById: session.user.id },
+                })),
+              },
+            }
+          : {}),
       },
       include: {
         tags: true,
+        courseTenants: { select: { tenantId: true } },
         activeVersion: { select: { versionNumber: true } },
         _count: { select: { versions: true } },
       },
@@ -134,14 +172,21 @@ export async function POST(req: NextRequest) {
         isContractorVisible:  meta.contractorVisible,
         complianceTags:       meta.complianceTags,
         status:               "DRAFT",
-        tenantId:             session.user.tenantId,
+        tenantId:             selectedTenantIds[0],
         createdById:          session.user.id,
         externalId:           meta.externalId ?? null,
+        courseTenants: {
+          create: selectedTenantIds.map((tenantId) => ({
+            tenantId,
+            assignedById: session.user.id,
+          })),
+        },
         tags:      { create: meta.tags.map((tag) => ({ tag })) },
         languages: { create: [{ language: "en", isDefault: true }] },
       },
       include: {
         tags: true,
+        courseTenants: { select: { tenantId: true } },
         activeVersion: { select: { versionNumber: true } },
         _count: { select: { versions: true } },
       },

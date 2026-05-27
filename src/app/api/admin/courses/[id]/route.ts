@@ -24,6 +24,11 @@ function requireAdmin(session: Session | null): boolean {
   return roles.includes("SUPER_ADMIN") || roles.includes("TENANT_ADMIN") || roles.includes("INSTRUCTOR");
 }
 
+function isSuperAdmin(session: Session): boolean {
+  const roles = session.user.roles ?? [];
+  return roles.includes("SUPER_ADMIN");
+}
+
 // GET /api/admin/courses/[id]
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -32,10 +37,16 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
   const { id } = await params;
   const course = await db.course.findFirst({
-    where: { id, tenantId: session.user.tenantId },
+    where: {
+      id,
+      ...(isSuperAdmin(session)
+        ? {}
+        : { courseTenants: { some: { tenantId: session.user.tenantId } } }),
+    },
     include: {
       tags: true,
       languages: true,
+      courseTenants: { select: { tenantId: true } },
       activeVersion: true,
       versions: {
         include: { uploadedBy: { select: { name: true, email: true } } },
@@ -55,7 +66,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { id } = await params;
-  const existing = await db.course.findFirst({ where: { id, tenantId: session.user.tenantId } });
+  const existing = await db.course.findFirst({
+    where: {
+      id,
+      ...(isSuperAdmin(session)
+        ? {}
+        : { courseTenants: { some: { tenantId: session.user.tenantId } } }),
+    },
+    include: { courseTenants: { select: { tenantId: true } } },
+  });
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const body = await req.json();
@@ -81,14 +100,19 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           }
         : {}),
     },
-    include: { tags: true, languages: true, activeVersion: true },
+    include: {
+      tags: true,
+      languages: true,
+      activeVersion: true,
+      courseTenants: { select: { tenantId: true } },
+    },
   });
 
   // Sync to Meilisearch when publishing or re-publishing
   if (course.status === "PUBLISHED") {
     await indexCourse({
       id: course.id,
-      tenantId: course.tenantId,
+      tenantIds: course.courseTenants.map((ct) => ct.tenantId),
       title: course.title,
       description: course.description,
       category: course.category,
@@ -121,7 +145,12 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
 
   const { id } = await params;
   const existing = await db.course.findFirst({
-    where: { id, tenantId: session.user.tenantId },
+    where: {
+      id,
+      ...(isSuperAdmin(session)
+        ? {}
+        : { courseTenants: { some: { tenantId: session.user.tenantId } } }),
+    },
     include: { versions: { select: { s3Prefix: true } } },
   });
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });

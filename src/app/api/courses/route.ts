@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
   const limit = Math.min(50, Math.max(1, parseInt(searchParams.get("limit") ?? "20", 10)));
 
   const meiliFilters: string[] = [
-    `tenantId = "${session.user.tenantId}"`,
+    `tenantIds = "${session.user.tenantId}"`,
     `status = "PUBLISHED"`,
   ];
   if (category) meiliFilters.push(`category = "${category}"`);
@@ -50,7 +50,7 @@ export async function GET(req: NextRequest) {
   } catch {
     // Meilisearch unavailable — fall back to Prisma
     const where = {
-      tenantId: session.user.tenantId,
+      courseTenants: { some: { tenantId: session.user.tenantId } },
       status: "PUBLISHED" as const,
       ...(category ? { category } : {}),
       ...(tag ? { tags: { some: { tag } } } : {}),

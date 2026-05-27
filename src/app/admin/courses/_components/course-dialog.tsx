@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -21,9 +21,17 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>;
 
+interface TenantOption {
+  id: string;
+  name: string;
+}
+
 interface Props {
   open: boolean;
   course: CourseRow | null;
+  isSuperAdmin: boolean;
+  currentTenantId: string;
+  tenants: TenantOption[];
   onClose: () => void;
   onSaved: () => void;
 }
@@ -40,13 +48,24 @@ const CATEGORIES = [
   "Other",
 ];
 
-export function CourseDialog({ open, course, onClose, onSaved }: Props) {
+export function CourseDialog({
+  open,
+  course,
+  isSuperAdmin,
+  currentTenantId,
+  tenants,
+  onClose,
+  onSaved,
+}: Props) {
   const isEdit = !!course;
   const [tagInput, setTagInput] = useState("");
   const [tags, setTags] = useState<string[]>(course?.tags?.map((t) => t.tag) ?? []);
   const [compTags, setCompTags] = useState<string[]>(course?.complianceTags ?? []);
   const [compInput, setCompInput] = useState("");
   const [serverError, setServerError] = useState<string | null>(null);
+  const [selectedTenantIds, setSelectedTenantIds] = useState<string[]>(
+    course?.courseTenants?.map((ct) => ct.tenantId) ?? [currentTenantId],
+  );
 
   const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<FormValues>({
     resolver: zodResolver(schema) as Resolver<FormValues>,
@@ -58,6 +77,19 @@ export function CourseDialog({ open, course, onClose, onSaved }: Props) {
       isContractorVisible: course?.isContractorVisible ?? false,
     },
   });
+
+  useEffect(() => {
+    setTags(course?.tags?.map((t) => t.tag) ?? []);
+    setCompTags(course?.complianceTags ?? []);
+    setSelectedTenantIds(course?.courseTenants?.map((ct) => ct.tenantId) ?? [currentTenantId]);
+    reset({
+      title: course?.title ?? "",
+      description: course?.description ?? "",
+      category: course?.category ?? "",
+      targetAudience: course?.targetAudience ?? "",
+      isContractorVisible: course?.isContractorVisible ?? false,
+    });
+  }, [course, currentTenantId, reset]);
 
   function addTag(val: string, list: string[], setList: (v: string[]) => void, setInput: (v: string) => void) {
     const trimmed = val.trim();
@@ -73,7 +105,21 @@ export function CourseDialog({ open, course, onClose, onSaved }: Props) {
 
   async function onSubmit(values: FormValues) {
     setServerError(null);
-    const payload = { ...values, tags, complianceTags: compTags };
+    const normalizedTenantIds = isSuperAdmin
+      ? Array.from(new Set(selectedTenantIds)).filter(Boolean)
+      : [currentTenantId];
+
+    if (isSuperAdmin && normalizedTenantIds.length === 0) {
+      setServerError("Select at least one tenant.");
+      return;
+    }
+
+    const payload = {
+      ...values,
+      tags,
+      complianceTags: compTags,
+      ...(isSuperAdmin ? { tenantIds: normalizedTenantIds } : {}),
+    };
 
     const res = await fetch(
       isEdit ? `/api/admin/courses/${course!.id}` : "/api/admin/courses",
@@ -90,9 +136,26 @@ export function CourseDialog({ open, course, onClose, onSaved }: Props) {
       return;
     }
 
+    const saved = (await res.json()) as CourseRow;
+
+    if (isSuperAdmin) {
+      const tenantRes = await fetch(`/api/admin/courses/${saved.id}/tenants`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tenantIds: normalizedTenantIds }),
+      });
+
+      if (!tenantRes.ok) {
+        const data = await tenantRes.json().catch(() => ({}));
+        setServerError((data as { error?: string }).error ?? "Failed to save tenant assignments");
+        return;
+      }
+    }
+
     reset();
     setTags([]);
     setCompTags([]);
+    setSelectedTenantIds([currentTenantId]);
     onSaved();
   }
 
@@ -147,6 +210,42 @@ export function CourseDialog({ open, course, onClose, onSaved }: Props) {
               className="bg-white/5 border-white/10 text-white"
             />
           </div>
+
+          {isSuperAdmin ? (
+            <div className="space-y-2">
+              <Label className="text-white/80">Tenant Assignment</Label>
+              <div className="max-h-36 space-y-1 overflow-y-auto rounded-md border border-white/10 bg-white/5 p-2">
+                {tenants.map((tenant) => {
+                  const checked = selectedTenantIds.includes(tenant.id);
+                  return (
+                    <label key={tenant.id} className="flex items-center gap-2 text-sm text-white/80">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 accent-[#cc3d00]"
+                        checked={checked}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedTenantIds((prev) => Array.from(new Set([...prev, tenant.id])));
+                          } else {
+                            setSelectedTenantIds((prev) => prev.filter((id) => id !== tenant.id));
+                          }
+                        }}
+                      />
+                      <span>{tenant.name}</span>
+                    </label>
+                  );
+                })}
+              </div>
+              <p className="text-xs text-white/50">Super Admin can assign this course to multiple tenants.</p>
+            </div>
+          ) : (
+            <div className="space-y-1.5">
+              <Label className="text-white/80">Tenant</Label>
+              <div className="rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/70">
+                Current tenant only
+              </div>
+            </div>
+          )}
 
           {/* Tags */}
           <div className="space-y-1.5">

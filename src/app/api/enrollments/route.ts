@@ -51,7 +51,11 @@ export async function POST(req: NextRequest) {
 
   // Verify the course is published in the user's tenant
   const course = await db.course.findFirst({
-    where: { id: courseId, tenantId: session.user.tenantId, status: "PUBLISHED" },
+    where: {
+      id: courseId,
+      status: "PUBLISHED",
+      courseTenants: { some: { tenantId: session.user.tenantId } },
+    },
     include: { activeVersion: { select: { id: true } } },
   });
   if (!course) return NextResponse.json({ error: "Course not found or not published" }, { status: 404 });

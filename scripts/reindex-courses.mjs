@@ -43,10 +43,10 @@ async function ensureIndex() {
   }
   await meiliPatch(`/indexes/${INDEX}/settings`, {
     searchableAttributes: ['title', 'description', 'objectives', 'tags', 'category', 'targetAudience'],
-    filterableAttributes: ['status', 'category', 'tags', 'tenantId'],
+    filterableAttributes: ['status', 'category', 'tags', 'tenantIds'],
     sortableAttributes:   ['publishedAt', 'title'],
     displayedAttributes:  ['id', 'title', 'description', 'category', 'tags', 'durationMinutes',
-                           'status', 'thumbnailUrl', 'tenantId', 'publishedAt', 'duration', 'targetAudience'],
+                           'status', 'thumbnailUrl', 'tenantIds', 'publishedAt', 'duration', 'targetAudience'],
   });
 }
 
@@ -58,15 +58,20 @@ async function main() {
   await client.connect();
 
   const { rows: courses } = await client.query(`
-    SELECT c.id, c."tenantId", c.title, c.description, c.category,
+    SELECT c.id, c.title, c.description, c.category,
            c.objectives, c."targetAudience", c.duration, c."thumbnailUrl",
            c."updatedAt",
            COALESCE(
-             json_agg(t.tag) FILTER (WHERE t.tag IS NOT NULL),
+             json_agg(DISTINCT t.tag) FILTER (WHERE t.tag IS NOT NULL),
              '[]'
-           ) AS tags
+           ) AS tags,
+           COALESCE(
+             json_agg(DISTINCT ct."tenantId") FILTER (WHERE ct."tenantId" IS NOT NULL),
+             '[]'
+           ) AS "tenantIds"
     FROM   courses c
     LEFT   JOIN course_tags t ON t."courseId" = c.id
+    LEFT   JOIN course_tenants ct ON ct."courseId" = c.id
     WHERE  c.status = 'PUBLISHED'
     GROUP  BY c.id
   `);
@@ -80,7 +85,7 @@ async function main() {
 
   const docs = courses.map((c) => ({
     id:             c.id,
-    tenantId:       c.tenantId,
+    tenantIds:      Array.isArray(c.tenantIds) ? c.tenantIds : [],
     title:          c.title,
     description:    c.description,
     category:       c.category,

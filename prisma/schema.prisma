@@ -37,6 +37,7 @@ model Tenant {
   jobTitles   JobTitle[]
   hrisSyncLogs HrisSyncLog[]
   courses      Course[]
+  courseTenants CourseTenant[]
   enrollments  Enrollment[]
   learningPaths LearningPath[]
   curricula    Curriculum[]
@@ -174,6 +175,7 @@ model User {
   accounts      Account[]  // OAuth / SAML providers (NextAuth)
   passwordResets PasswordResetToken[]
   createdCourses Course[]        @relation("CourseCreator")
+  assignedCourseTenants CourseTenant[] @relation("CourseTenantAssignedBy")
   uploadedVersions CourseVersion[] @relation("VersionUploader")
   enrollments           Enrollment[]           @relation("EnrolledUser")
   assignedEnrollments   Enrollment[]           @relation("AssignedBy")
@@ -355,12 +357,30 @@ model Course {
   ratings            CourseRating[]
   forumCategories    ForumCategory[]
   completionHistory  CourseCompletionHistory[]
+  courseTenants      CourseTenant[]
 
   @@index([tenantId])
   @@index([status])
   @@index([tenantId, status])
   @@unique([tenantId, externalId])
   @@map("courses")
+}
+
+model CourseTenant {
+  id           String   @id @default(cuid())
+  courseId     String
+  tenantId     String
+  assignedById String?
+  assignedAt   DateTime @default(now())
+
+  course      Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  tenant      Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  assignedBy  User?   @relation("CourseTenantAssignedBy", fields: [assignedById], references: [id])
+
+  @@unique([courseId, tenantId])
+  @@index([tenantId])
+  @@index([courseId])
+  @@map("course_tenants")
 }
 
 model CourseVersion {

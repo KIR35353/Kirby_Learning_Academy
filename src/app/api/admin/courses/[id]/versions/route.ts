@@ -28,10 +28,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     roles.includes("TENANT_ADMIN") ||
     roles.includes("INSTRUCTOR");
   if (!canUpload) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const isSuperAdmin = roles.includes("SUPER_ADMIN");
 
   const { id: courseId } = await params;
   const course = await db.course.findFirst({
-    where: { id: courseId, tenantId: session.user.tenantId },
+    where: {
+      id: courseId,
+      ...(isSuperAdmin
+        ? {}
+        : { courseTenants: { some: { tenantId: session.user.tenantId } } }),
+    },
     include: { _count: { select: { versions: true } } },
   });
   if (!course) return NextResponse.json({ error: "Course not found" }, { status: 404 });

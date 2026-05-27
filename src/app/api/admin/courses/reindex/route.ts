@@ -15,20 +15,26 @@ export async function POST(req: NextRequest) {
   const roles = session.user.roles ?? [];
   if (!roles.includes("SUPER_ADMIN") && !roles.includes("TENANT_ADMIN"))
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const isSuperAdmin = roles.includes("SUPER_ADMIN");
 
   // Ensure index settings are correct
   await initCourseIndex();
 
   const courses = await db.course.findMany({
-    where: { tenantId: session.user.tenantId, status: "PUBLISHED" },
-    include: { tags: true },
+    where: {
+      status: "PUBLISHED",
+      ...(isSuperAdmin
+        ? {}
+        : { courseTenants: { some: { tenantId: session.user.tenantId } } }),
+    },
+    include: { tags: true, courseTenants: { select: { tenantId: true } } },
   });
 
   let indexed = 0;
   for (const course of courses) {
     await indexCourse({
       id: course.id,
-      tenantId: course.tenantId,
+      tenantIds: course.courseTenants.map((ct) => ct.tenantId),
       title: course.title,
       description: course.description,
       category: course.category,

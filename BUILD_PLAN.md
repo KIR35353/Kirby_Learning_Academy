@@ -199,6 +199,63 @@ The LMS is responsible for **hosting, tracking, and managing** those course bund
 
 **Deliverable:** Admins can upload CBT zips; catalog is live and searchable.
 
+#### Phase 4 Add-on — Tenant-Dependent Course Catalog (Cross-Tenant Visibility)
+
+**Goal:** Keep catalog tenant-scoped for learners while allowing a single course to be available in multiple tenants.
+
+#### Access rules
+- [ ] Tenant Admin / Instructor creating a course: auto-assign the creator's current tenant only
+- [ ] Super Admin creating or editing a course: can assign one or many tenants
+- [ ] Tenant Admin / Instructor cannot assign/remove other tenants from a course
+
+#### Data model changes
+- [ ] Introduce join table `CourseTenant` (`courseId`, `tenantId`, `assignedById`, `assignedAt`)
+- [ ] Keep course ownership metadata (`createdById`) for audit; remove direct single-tenant coupling on course visibility
+- [ ] Add unique/indexes:
+  - `@@unique([courseId, tenantId])`
+  - `@@index([tenantId])`
+  - `@@index([courseId])`
+
+#### Migration & backfill
+- [ ] Create migration to add `CourseTenant`
+- [ ] Backfill existing data: for each existing course, insert one `CourseTenant` row from current `course.tenantId`
+- [ ] Update constraints after backfill (drop direct catalog dependency on `course.tenantId`)
+
+#### API changes
+- [ ] Admin create course API:
+  - For Tenant Admin / Instructor: ignore incoming tenant list, force `[currentTenantId]`
+  - For Super Admin: allow `tenantIds: string[]` and validate all tenant IDs exist
+- [ ] Admin update course API:
+  - Add endpoint/input to update tenant assignments (Super Admin only)
+  - Keep normal metadata edits available to Tenant Admin only when course is assigned to their tenant
+- [ ] Catalog query APIs:
+  - Replace `course.tenantId = session.user.tenantId` filter with relation filter via `CourseTenant`
+
+#### Search/indexing changes
+- [ ] Update Meilisearch documents to include `tenantIds: string[]`
+- [ ] Filter catalog search by `tenantIds CONTAINS currentTenantId` and `status = PUBLISHED`
+- [ ] Reindex existing courses after migration
+
+#### UI changes
+- [ ] Admin course form:
+  - Tenant Admin / Instructor: hide tenant selector, show read-only current tenant badge
+  - Super Admin: multi-select tenant control with search
+- [ ] Course list and detail pages: show assigned tenant count (Super Admin) and tenant badge chips
+
+#### Authorization and audit
+- [ ] Enforce role checks server-side only (UI visibility is not sufficient)
+- [ ] Record who assigned/removed tenant mappings in audit logs
+
+#### Testing
+- [ ] Unit tests for role-based tenant assignment rules
+- [ ] API tests for create/update/list with Tenant Admin vs Super Admin
+- [ ] E2E coverage:
+  - Tenant Admin creates course → only current tenant assigned
+  - Super Admin assigns multiple tenants → course visible in each tenant catalog
+  - Tenant Admin cannot modify cross-tenant assignments
+
+**Deliverable:** Catalog remains tenant-dependent for learners; course visibility supports one-to-many tenant assignment with Super Admin-only multi-tenant control.
+
 ---
 
 ### Phase 5 — Learning Delivery & Enrollment (Week 10–11)

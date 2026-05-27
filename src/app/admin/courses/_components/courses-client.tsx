@@ -28,8 +28,16 @@ import { ImportDialog } from "./import-dialog";
 import { UploadDialog } from "./upload-dialog";
 import type { CourseRow } from "./types";
 
+interface TenantOption {
+  id: string;
+  name: string;
+}
+
 interface Props {
   initialCourses: CourseRow[];
+  isSuperAdmin: boolean;
+  currentTenantId: string;
+  tenants: TenantOption[];
 }
 
 const STATUS_LABELS: Record<string, { label: string; className: string }> = {
@@ -39,7 +47,7 @@ const STATUS_LABELS: Record<string, { label: string; className: string }> = {
   ARCHIVED: { label: "Archived", className: "bg-red-900/40 text-red-400" },
 };
 
-export function CoursesClient({ initialCourses }: Props) {
+export function CoursesClient({ initialCourses, isSuperAdmin, currentTenantId, tenants }: Props) {
   const [courses, setCourses] = useState<CourseRow[]>(initialCourses);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -321,11 +329,17 @@ export function CoursesClient({ initialCourses }: Props) {
         open={importOpen}
         onClose={() => setImportOpen(false)}
         onImported={() => { refresh(); }}
+        isSuperAdmin={isSuperAdmin}
+        currentTenantId={currentTenantId}
+        tenants={tenants}
       />
 
       <CourseDialog
         open={createOpen || !!editCourse}
         course={editCourse}
+        isSuperAdmin={isSuperAdmin}
+        currentTenantId={currentTenantId}
+        tenants={tenants}
         onClose={() => { setCreateOpen(false); setEditCourse(null); }}
         onSaved={() => { setCreateOpen(false); setEditCourse(null); refresh(); }}
       />

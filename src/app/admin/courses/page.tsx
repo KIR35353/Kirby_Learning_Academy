@@ -11,6 +11,7 @@ export default async function AdminCoursesPage() {
   if (!session?.user) redirect("/login");
 
   const roles = session.user.roles ?? [];
+  const isSuperAdmin = roles.includes("SUPER_ADMIN");
   const canManage =
     roles.includes("SUPER_ADMIN") ||
     roles.includes("TENANT_ADMIN") ||
@@ -18,14 +19,26 @@ export default async function AdminCoursesPage() {
   if (!canManage) redirect("/unauthorized");
 
   const courses = await db.course.findMany({
-    where: { tenantId: session.user.tenantId },
+    where: {
+      ...(isSuperAdmin
+        ? {}
+        : { courseTenants: { some: { tenantId: session.user.tenantId } } }),
+    },
     include: {
       tags: true,
+      courseTenants: { select: { tenantId: true } },
       activeVersion: { select: { versionNumber: true } },
       _count: { select: { versions: true } },
     },
     orderBy: { updatedAt: "desc" },
   });
+
+  const tenants = isSuperAdmin
+    ? await db.tenant.findMany({
+        select: { id: true, name: true },
+        orderBy: { name: "asc" },
+      })
+    : [];
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
@@ -34,7 +47,12 @@ export default async function AdminCoursesPage() {
         <TopNav pageTitle="Courses" />
         <main className="flex-1 overflow-y-auto p-6 md:p-8">
           <p className="mb-6 text-sm text-white/50">Publish and manage CBT course bundles</p>
-          <CoursesClient initialCourses={courses} />
+          <CoursesClient
+            initialCourses={courses}
+            isSuperAdmin={isSuperAdmin}
+            currentTenantId={session.user.tenantId}
+            tenants={tenants}
+          />
         </main>
       </div>
     </div>

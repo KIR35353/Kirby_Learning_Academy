@@ -12,6 +12,7 @@ const createSchema = z.object({
   isContractorVisible: z.boolean().optional().default(false),
   tags: z.array(z.string()).optional().default([]),
   languages: z.array(z.string()).optional().default(["en"]),
+  tenantIds: z.array(z.string()).optional().default([]),
 });
 
 // GET /api/admin/courses — list courses for tenant
@@ -22,6 +23,7 @@ export async function GET(req: NextRequest) {
   const roles = session.user.roles ?? [];
   const isAdmin = roles.includes("SUPER_ADMIN") || roles.includes("TENANT_ADMIN") || roles.includes("INSTRUCTOR");
   if (!isAdmin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const isSuperAdmin = roles.includes("SUPER_ADMIN");
 
   const { searchParams } = new URL(req.url);
   const status = searchParams.get("status");
@@ -30,7 +32,9 @@ export async function GET(req: NextRequest) {
 
   const courses = await db.course.findMany({
     where: {
-      tenantId: session.user.tenantId,
+      ...(isSuperAdmin
+        ? {}
+        : { courseTenants: { some: { tenantId: session.user.tenantId } } }),
       ...(status ? { status: status as never } : {}),
       ...(category ? { category } : {}),
       ...(q
@@ -45,6 +49,7 @@ export async function GET(req: NextRequest) {
     include: {
       tags: true,
       languages: true,
+      courseTenants: { select: { tenantId: true } },
       activeVersion: { select: { versionNumber: true, s3Prefix: true } },
       _count: { select: { versions: true } },
     },
@@ -62,24 +67,42 @@ export async function POST(req: NextRequest) {
   const roles = session.user.roles ?? [];
   const isAdmin = roles.includes("SUPER_ADMIN") || roles.includes("TENANT_ADMIN") || roles.includes("INSTRUCTOR");
   if (!isAdmin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const isSuperAdmin = roles.includes("SUPER_ADMIN");
 
   const body = await req.json();
   const parsed = createSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
-  const { tags, languages, ...data } = parsed.data;
+  const { tags, languages, tenantIds, ...data } = parsed.data;
+
+  const selectedTenantIds = isSuperAdmin
+    ? (tenantIds.length > 0 ? Array.from(new Set(tenantIds)) : [session.user.tenantId])
+    : [session.user.tenantId];
+
+  if (isSuperAdmin) {
+    const tenantCount = await db.tenant.count({ where: { id: { in: selectedTenantIds } } });
+    if (tenantCount !== selectedTenantIds.length) {
+      return NextResponse.json({ error: "One or more tenantIds are invalid" }, { status: 400 });
+    }
+  }
 
   const course = await db.course.create({
     data: {
       ...data,
-      tenantId: session.user.tenantId,
+      tenantId: selectedTenantIds[0],
       createdById: session.user.id,
+      courseTenants: {
+        create: selectedTenantIds.map((tenantId) => ({
+          tenantId,
+          assignedById: session.user.id,
+        })),
+      },
       tags: { create: tags.map((tag) => ({ tag })) },
       languages: {
         create: languages.map((lang, i) => ({ language: lang, isDefault: i === 0 })),
       },
     },
-    include: { tags: true, languages: true },
+    include: { tags: true, languages: true, courseTenants: { select: { tenantId: true } } },
   });
 
   return NextResponse.json(course, { status: 201 });

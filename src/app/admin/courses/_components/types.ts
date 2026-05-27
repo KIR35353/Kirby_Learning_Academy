@@ -9,6 +9,10 @@ export interface CourseActiveVersion {
   versionNumber: number;
 }
 
+export interface CourseTenantRef {
+  tenantId: string;
+}
+
 export interface CourseRow {
   id: string;
   title: string;
@@ -24,6 +28,7 @@ export interface CourseRow {
   activeVersionId: string | null;
   activeVersion: CourseActiveVersion | null;
   tags: CourseTag[];
+  courseTenants?: CourseTenantRef[];
   createdAt: Date | string;
   updatedAt: Date | string;
   _count: { versions: number };
