@@ -14,7 +14,46 @@ const ALLOWED_TYPES = new Set([
   "image/vnd.microsoft.icon",
 ]);
 
+const FAVICON_ALLOWED_TYPES = new Set([
+  "image/png",
+  "image/x-icon",
+  "image/vnd.microsoft.icon",
+]);
+
 const VALID_ASSET_TYPES = new Set(["logo", "favicon", "loginBanner"]);
+
+function validatePng16x16(buffer: Buffer): boolean {
+  // PNG IHDR width/height are 4-byte big-endian at offsets 16 and 20.
+  if (buffer.length < 24) return false;
+  const pngSig = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+  for (let i = 0; i < pngSig.length; i += 1) {
+    if (buffer[i] !== pngSig[i]) return false;
+  }
+  const width = buffer.readUInt32BE(16);
+  const height = buffer.readUInt32BE(20);
+  return width === 16 && height === 16;
+}
+
+function validateIcoHas16x16(buffer: Buffer): boolean {
+  // ICO header: reserved(2), type(2), count(2), then count entries of 16 bytes.
+  if (buffer.length < 22) return false;
+  const reserved = buffer.readUInt16LE(0);
+  const type = buffer.readUInt16LE(2);
+  const count = buffer.readUInt16LE(4);
+  if (reserved !== 0 || type !== 1 || count < 1) return false;
+
+  for (let i = 0; i < count; i += 1) {
+    const entryOffset = 6 + i * 16;
+    if (entryOffset + 16 > buffer.length) break;
+    const widthRaw = buffer.readUInt8(entryOffset);
+    const heightRaw = buffer.readUInt8(entryOffset + 1);
+    const width = widthRaw === 0 ? 256 : widthRaw;
+    const height = heightRaw === 0 ? 256 : heightRaw;
+    if (width === 16 && height === 16) return true;
+  }
+
+  return false;
+}
 
 // POST /api/admin/tenants/[id]/branding/upload?type=logo|favicon|loginBanner
 export async function POST(req: NextRequest, { params }: Params) {
@@ -56,6 +95,13 @@ export async function POST(req: NextRequest, { params }: Params) {
     );
   }
 
+  if (assetType === "favicon" && !FAVICON_ALLOWED_TYPES.has(f.type)) {
+    return NextResponse.json(
+      { error: "Favicon must be PNG or ICO." },
+      { status: 415 },
+    );
+  }
+
   // Derive a clean extension from the MIME type (don't trust the filename)
   const extMap: Record<string, string> = {
     "image/png": "png",
@@ -72,6 +118,21 @@ export async function POST(req: NextRequest, { params }: Params) {
   const key = `tenants/${id}/branding/${assetType}.${ext}`;
 
   const buffer = Buffer.from(await f.arrayBuffer());
+
+  if (assetType === "favicon") {
+    const isValidSize =
+      f.type === "image/png"
+        ? validatePng16x16(buffer)
+        : validateIcoHas16x16(buffer);
+
+    if (!isValidSize) {
+      return NextResponse.json(
+        { error: "Favicon must be exactly 16x16 pixels." },
+        { status: 400 },
+      );
+    }
+  }
+
   await uploadObject(key, buffer, f.type);
 
   const url = `${getPublicFileUrl(key)}?v=${Date.now()}`;

@@ -38,7 +38,7 @@ export function BrandingImageUpload({ label, value, onChange, tenantId, type, hi
       return;
     }
     if (!ALLOWED_MIME.includes(file.type)) {
-      setError("Use PNG, JPG, GIF, WebP, SVG, or ICO");
+      setError(type === "favicon" ? "Use PNG or ICO" : "Use PNG, JPG, GIF, WebP, SVG, or ICO");
       return;
     }
     setUploading(true);
@@ -132,7 +132,9 @@ export function BrandingImageUpload({ label, value, onChange, tenantId, type, hi
                 <p className="text-[11px] text-muted-foreground/60">{hint}</p>
               )}
               <p className="text-[11px] text-muted-foreground/50">
-                PNG, JPG, SVG, ICO · max 2 MB
+                {type === "favicon"
+                  ? "PNG or ICO, must be 16x16 · max 2 MB"
+                  : "PNG, JPG, SVG, ICO · max 2 MB"}
               </p>
             </>
           )}
@@ -144,7 +146,7 @@ export function BrandingImageUpload({ label, value, onChange, tenantId, type, hi
       <input
         ref={inputRef}
         type="file"
-        accept="image/*,.ico"
+        accept={type === "favicon" ? ".png,.ico,image/png,image/x-icon,image/vnd.microsoft.icon" : "image/*,.ico"}
         className="hidden"
         onChange={(e) => onFiles(e.target.files)}
       />
