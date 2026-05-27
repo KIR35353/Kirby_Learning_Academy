@@ -1,3 +1,4 @@
+import React from "react";
 import { ImageResponse } from "next/og";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -65,9 +66,10 @@ export default async function favicon() {
 
   // Default Kirby Learning Academy favicon
   return new ImageResponse(
-    (
-      <div
-        style={{
+    React.createElement(
+      "div",
+      {
+        style: {
           fontSize: 88,
           background: "linear-gradient(135deg, #003366 0%, #004d99 100%)",
           width: "100%",
@@ -77,10 +79,9 @@ export default async function favicon() {
           justifyContent: "center",
           color: "white",
           fontWeight: "bold",
-        }}
-      >
-        K
-      </div>
+        },
+      },
+      "K",
     ),
     {
       width: 32,
