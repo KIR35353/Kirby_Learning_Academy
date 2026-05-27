@@ -46,6 +46,7 @@ async function getLoginBranding(): Promise<LoginBranding | null> {
         { appName: { not: null } },
         { supportEmail: { not: null } },
         { logoUrl: { not: null } },
+        { faviconUrl: { not: null } },
         { loginBannerUrl: { not: null } },
       ],
     },

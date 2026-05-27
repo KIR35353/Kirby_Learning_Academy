@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { SessionProvider } from "next-auth/react";
 import Script from "next/script";
+import { headers } from "next/headers";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -20,9 +21,34 @@ const inter = Inter({
 const getTenantBranding = cache(async () => {
   const session = await auth();
   const tenantId = (session?.user as Record<string, unknown>)?.tenantId as string | undefined;
-  if (!tenantId) return null;
-  return db.tenant.findUnique({
-    where: { id: tenantId },
+  if (tenantId) {
+    const bySession = await db.tenant.findUnique({
+      where: { id: tenantId },
+      select: {
+        logoUrl: true,
+        loginBannerUrl: true,
+        appName: true,
+        faviconUrl: true,
+        primaryColor: true,
+        primaryForegroundColor: true,
+        sidebarColor: true,
+        accentColor: true,
+        updatedAt: true,
+      },
+    });
+    if (bySession) return bySession;
+  }
+
+  const hostHeader = (await headers()).get("host")?.toLowerCase() ?? "";
+  const host = hostHeader.split(":")[0];
+  const [subdomain] = host.split(".");
+
+  if (!host) return null;
+
+  return db.tenant.findFirst({
+    where: {
+      OR: [{ slug: subdomain || undefined }, { domain: host }],
+    },
     select: {
       logoUrl: true,
       loginBannerUrl: true,
