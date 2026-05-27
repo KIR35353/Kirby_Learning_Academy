@@ -5,8 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "dev:all": "powershell -ExecutionPolicy Bypass -File scripts/Start-Dev.ps1",
-    "generate": "prisma generate && node -e \"require('fs').writeFileSync('src/generated/prisma/index.ts', '// Re-export all generated Prisma types and enums for convenience\\nexport * from \\\"./enums\\\";\\nexport * from \\\"./models\\\";\\n')\"",
-    "prebuild": "node -e \"const fs=require('fs');if(!fs.existsSync('src/generated/prisma/index.ts')){fs.writeFileSync('src/generated/prisma/index.ts','// Re-export all generated Prisma types and enums for convenience\\nexport * from \\\"./enums\\\";\\nexport * from \\\"./models\\\";\\n')}\"",
+    "generate": "prisma generate",
+    "prebuild": "node scripts/ensure-prisma-index.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
