@@ -24,8 +24,36 @@ ssh -i hanson01.pem -o StrictHostKeyChecking=no azureuser@hanson01.eastus.clouda
 - Node.js 22+
 - npm 10+
 - PostgreSQL 16 running (via Docker Compose or native)
+- PowerShell 5.1+ (for build/deploy scripts)
 
-### Full Build
+### Automated Build Validation (Recommended)
+
+Use the automated build script for comprehensive validation before deploying:
+
+**Full Build with All Checks** (TypeScript, lint, format, build):
+```powershell
+.\scripts\Build-Local.ps1
+```
+
+**Quick Build** (TypeScript + Build only):
+```powershell
+.\scripts\Build-Local.ps1 -Quick
+```
+
+**Clean Build** (remove artifacts and rebuild):
+```powershell
+.\scripts\Build-Local.ps1 -Clean
+```
+
+**Development Server**:
+```powershell
+.\scripts\Build-Local.ps1 -Watch
+```
+
+### Manual Build Steps
+
+If you prefer to build manually:
+
 ```bash
 cd c:\S2L_Dev\Kirby_Learning_Academy
 npm ci
@@ -33,13 +61,13 @@ npx prisma generate
 npm run build
 ```
 
-### Development Server
+### Manual Development Server
 ```bash
 npm run dev
 # App runs on http://localhost:3000
 ```
 
-### Linting & Type Check
+### Manual Linting & Type Check
 ```bash
 npm run lint
 npm run typecheck
@@ -50,13 +78,55 @@ npm run format:check
 
 ## Deployment to Production
 
-### One-Command Full Deploy
+### Automated Deployment (Recommended)
+
+Use the automated deployment script for reliable production deployments with error handling, verification, and automatic rollback:
+
+**Standard Deployment**:
+```powershell
+.\scripts\Deploy-Prod.ps1
+```
+
+**Force Deployment** (skip confirmation):
+```powershell
+.\scripts\Deploy-Prod.ps1 -Force
+```
+
+**Dry Run** (show what would deploy without making changes):
+```powershell
+.\scripts\Deploy-Prod.ps1 -DryRun
+```
+
+**Rollback to Previous Commit**:
+```powershell
+.\scripts\Deploy-Prod.ps1 -Rollback
+```
+
+The script handles:
+- ✅ SSH connection verification
+- ✅ Error detection and reporting
+- ✅ Proper timeouts for long-running builds
+- ✅ Build verification (checking for BUILD_ID file)
+- ✅ PM2 status verification
+- ✅ HTTP health checks with retries
+- ✅ Automatic rollback on failure
+
+**Output**: Logs saved to `deploy-log-YYYYMMDD-HHMMSS.txt`
+
+### One-Command Manual Deploy
+
+If you prefer to deploy manually without the script:
+
 ```bash
 ssh -i hanson01.pem -o StrictHostKeyChecking=no azureuser@hanson01.eastus.cloudapp.azure.com \
   "cd /opt/kla && git pull origin main && npm run build && pm2 restart kla && pm2 save"
 ```
 
-### Step-by-Step Deploy
+**Note**: This lacks error handling and verification. The automated script is recommended for production safety.
+
+### Step-by-Step Manual Deploy
+
+If you prefer to deploy manually without the automated script:
 
 1. **Commit & Push Changes**
    ```bash
@@ -93,6 +163,8 @@ ssh -i hanson01.pem -o StrictHostKeyChecking=no azureuser@hanson01.eastus.clouda
    pm2 status
    pm2 logs kla --lines 20
    ```
+
+**Recommendation**: Use the automated script (`.\scripts\Deploy-Prod.ps1`) for safer, more reliable deployments with automatic error handling and rollback.
 
 ---
 
@@ -196,6 +268,13 @@ ssh -i hanson01.pem azureuser@hanson01.eastus.cloudapp.azure.com \
 
 ## Pre-Deployment Checklist
 
+### Recommended Approach
+- [ ] Run `.\scripts\Build-Local.ps1` locally and verify success
+- [ ] Code committed to git
+- [ ] Changes pushed to origin main
+- [ ] No untracked `.env` files being tracked by git
+
+### Manual Approach (if not using script)
 - [ ] Code committed to git
 - [ ] `npm run lint` passes locally
 - [ ] `npm run typecheck` passes locally

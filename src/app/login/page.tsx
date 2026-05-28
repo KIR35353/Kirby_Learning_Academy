@@ -1,8 +1,10 @@
 import { LoginClient } from "./_components/login-client";
 import type { AuthMode } from "@/lib/auth";
 import type { Metadata } from "next";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { db } from "@/lib/db";
+
+const LAST_TENANT_COOKIE = "kla_last_tenant_id";
 
 type LoginBranding = {
   appName: string | null;
@@ -14,6 +16,24 @@ type LoginBranding = {
 };
 
 async function getLoginBranding(): Promise<LoginBranding | null> {
+  const cookieStore = await cookies();
+  const lastTenantId = cookieStore.get(LAST_TENANT_COOKIE)?.value;
+
+  if (lastTenantId) {
+    const byLastTenant = await db.tenant.findUnique({
+      where: { id: lastTenantId },
+      select: {
+        appName: true,
+        logoUrl: true,
+        faviconUrl: true,
+        loginBannerUrl: true,
+        supportEmail: true,
+        updatedAt: true,
+      },
+    });
+    if (byLastTenant) return byLastTenant;
+  }
+
   const hostHeader = (await headers()).get("host")?.toLowerCase() ?? "";
   const host = hostHeader.split(":")[0];
   const [subdomain] = host.split(".");
@@ -38,38 +58,8 @@ async function getLoginBranding(): Promise<LoginBranding | null> {
     : null;
   if (byHost) return byHost;
 
-  // If host/domain does not resolve a tenant (common on shared VM hostnames),
-  // prefer a tenant that has branding configured.
-  return db.tenant.findFirst({
-    where: {
-      OR: [
-        { appName: { not: null } },
-        { supportEmail: { not: null } },
-        { logoUrl: { not: null } },
-        { faviconUrl: { not: null } },
-        { loginBannerUrl: { not: null } },
-      ],
-    },
-    orderBy: { updatedAt: "desc" },
-    select: {
-      appName: true,
-      logoUrl: true,
-      faviconUrl: true,
-      loginBannerUrl: true,
-      supportEmail: true,
-      updatedAt: true,
-    },
-  }) ?? db.tenant.findFirst({
-    orderBy: { createdAt: "asc" },
-    select: {
-      appName: true,
-      logoUrl: true,
-      faviconUrl: true,
-      loginBannerUrl: true,
-      supportEmail: true,
-      updatedAt: true,
-    },
-  });
+  // First-time login on shared host with no cookie should be unbranded.
+  return null;
 }
 
 export async function generateMetadata(): Promise<Metadata> {

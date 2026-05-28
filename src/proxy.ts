@@ -2,6 +2,8 @@ import { auth } from "@/lib/auth-edge";
 import { NextResponse } from "next/server";
 import type { NextAuthRequest } from "next-auth";
 
+const LAST_TENANT_COOKIE = "kla_last_tenant_id";
+
 // Routes that don't require authentication
 const publicRoutes = [
   "/login",
@@ -20,6 +22,23 @@ function isPublicRoute(pathname: string) {
   return publicRoutes.some((route) => pathname.startsWith(route));
 }
 
+function withLastTenantCookie(req: NextAuthRequest, res: NextResponse): NextResponse {
+  const user = req.auth?.user as Record<string, unknown> | undefined;
+  const tenantId = user?.tenantId;
+
+  if (typeof tenantId === "string" && tenantId) {
+    res.cookies.set(LAST_TENANT_COOKIE, tenantId, {
+      path: "/",
+      sameSite: "lax",
+      secure: req.nextUrl.protocol === "https:",
+      httpOnly: false,
+      maxAge: 60 * 60 * 24 * 365,
+    });
+  }
+
+  return res;
+}
+
 export default auth((req: NextAuthRequest) => {
   const { pathname } = req.nextUrl;
 
@@ -30,7 +49,7 @@ export default auth((req: NextAuthRequest) => {
     pathname.startsWith("/favicon") ||
     pathname.match(/\.(png|jpg|jpeg|svg|ico|webp)$/)
   ) {
-    return NextResponse.next();
+    return withLastTenantCookie(req, NextResponse.next());
   }
 
   // Not authenticated → redirect to login
@@ -67,7 +86,7 @@ export default auth((req: NextAuthRequest) => {
     }
   }
 
-  return NextResponse.next();
+  return withLastTenantCookie(req, NextResponse.next());
 });
 
 export const config = {
