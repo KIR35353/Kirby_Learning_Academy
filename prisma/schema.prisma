@@ -1093,6 +1093,8 @@ model JobSchedule {
   lastRunAt   DateTime?
   createdAt   DateTime  @default(now())
 
+  tenant      Tenant    @relation(fields: [tenantId], references: [id])
+
   @@index([tenantId])
   @@map("job_schedules")
 }
