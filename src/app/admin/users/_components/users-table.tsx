@@ -8,23 +8,23 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { UserFormDialog } from "./user-form-dialog";
 import { ImportDialog } from "./import-dialog";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
   Search,
   UserPlus,
   Upload,
-  MoreHorizontal,
   ShieldCheck,
   HardHat,
   ChevronLeft,
   ChevronRight,
   Trash2,
+  Pencil,
+  CircleOff,
 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 type Department = { id: string; name: string };
 type Location = { id: string; name: string };
@@ -237,6 +237,9 @@ export function UsersTable({ departments, locations, allRoles, tenants, isSuperA
               <th className="px-4 py-3 text-left font-medium text-muted-foreground hidden lg:table-cell">
                 Roles
               </th>
+              <th className="px-4 py-3 text-left font-medium text-muted-foreground hidden sm:table-cell">
+                Tenant
+              </th>
               <th className="px-4 py-3 text-left font-medium text-muted-foreground">
                 Status
               </th>
@@ -249,14 +252,14 @@ export function UsersTable({ departments, locations, allRoles, tenants, isSuperA
             {loading ? (
               Array.from({ length: 5 }).map((_, i) => (
                 <tr key={i} className="border-b border-border animate-pulse">
-                  <td colSpan={5} className="px-4 py-3">
+                  <td colSpan={6} className="px-4 py-3">
                     <div className="h-4 bg-muted rounded w-3/4" />
                   </td>
                 </tr>
               ))
             ) : users.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-4 py-10 text-center text-muted-foreground">
+                <td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">
                   No users found
                 </td>
               </tr>
@@ -303,6 +306,11 @@ export function UsersTable({ departments, locations, allRoles, tenants, isSuperA
                       ))}
                     </div>
                   </td>
+                  <td className="px-4 py-3 hidden sm:table-cell">
+                    <div className="text-sm text-foreground">
+                      {user.tenant?.name ?? "—"}
+                    </div>
+                  </td>
                   <td className="px-4 py-3">
                     {user.isActive ? (
                       <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
@@ -313,34 +321,55 @@ export function UsersTable({ departments, locations, allRoles, tenants, isSuperA
                       <Badge variant="secondary">Inactive</Badge>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger className="inline-flex h-7 w-7 items-center justify-center rounded-md p-0 text-sm font-medium hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                        <MoreHorizontal className="h-4 w-4" />
-                        <span className="sr-only">Actions</span>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => setEditUser(user)}>
-                          Edit
-                        </DropdownMenuItem>
+                  <td className="px-4 py-3">
+                    <TooltipProvider>
+                      <div className="flex items-center justify-end gap-2">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setEditUser(user)}
+                              className="h-8 w-8 p-0 hover:bg-blue-100 hover:text-blue-600"
+                            >
+                              <Pencil className="h-4 w-4" />
+                              <span className="sr-only">Edit</span>
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Edit</TooltipContent>
+                        </Tooltip>
                         {user.isActive && (
-                          <DropdownMenuItem
-                            onClick={() => deactivateUser(user.id)}
-                            className="text-destructive focus:text-destructive"
-                          >
-                            Deactivate
-                          </DropdownMenuItem>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => deactivateUser(user.id)}
+                                className="h-8 w-8 p-0 hover:bg-amber-100 hover:text-amber-600"
+                              >
+                                <CircleOff className="h-4 w-4" />
+                                <span className="sr-only">Deactivate</span>
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Deactivate</TooltipContent>
+                          </Tooltip>
                         )}
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          onClick={() => permanentlyDeleteUser(user)}
-                          className="text-destructive focus:text-destructive"
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Delete Permanently
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => permanentlyDeleteUser(user)}
+                              className="h-8 w-8 p-0 hover:bg-red-100 hover:text-red-600"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                              <span className="sr-only">Delete</span>
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Delete Permanently</TooltipContent>
+                        </Tooltip>
+                      </div>
+                    </TooltipProvider>
                   </td>
                 </tr>
               ))
