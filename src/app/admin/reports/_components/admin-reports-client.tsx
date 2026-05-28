@@ -107,6 +107,9 @@ const STATUS_COLORS: Record<string, string> = {
   FAILED: "#ef4444",
 };
 
+const FILTER_CONTROL_CLASS = "rounded-lg border border-white/20 bg-white text-slate-900 px-3 py-1.5 text-sm";
+const FILTER_OPTION_CLASS = "bg-white text-slate-900";
+
 // ── Sub-components ─────────────────────────────────────────────────────────
 
 function StatCard({ icon, label, value, sub }: { icon: React.ReactNode; label: string; value: string | number; sub?: string }) {
@@ -253,15 +256,15 @@ export function AdminReportsClient({
         <div className="flex items-center gap-2 flex-wrap">
           {isSuperAdmin && (
             <select value={selectedTenantId} onChange={(e) => setSelectedTenantId(e.target.value)}
-              className="rounded-lg bg-white/5 border border-white/10 text-white/70 px-3 py-1.5 text-sm">
-              <option value="">Select tenant...</option>
-              {tenants.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+              className={FILTER_CONTROL_CLASS}>
+              <option className={FILTER_OPTION_CLASS} value="">Select tenant...</option>
+              {tenants.map((t) => <option className={FILTER_OPTION_CLASS} key={t.id} value={t.id}>{t.name}</option>)}
             </select>
           )}
           <select value={deptId} onChange={(e) => setDeptId(e.target.value)}
-            className="rounded-lg bg-white/5 border border-white/10 text-white/70 px-3 py-1.5 text-sm">
-            <option value="">All departments</option>
-            {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+            className={FILTER_CONTROL_CLASS}>
+            <option className={FILTER_OPTION_CLASS} value="">All departments</option>
+            {departments.map((d) => <option className={FILTER_OPTION_CLASS} key={d.id} value={d.id}>{d.name}</option>)}
           </select>
           <Button
             onClick={activeTab === "effectiveness" ? loadEffectiveness : activeTab === "userPerformance" ? loadUserSummary : loadOverview}
@@ -397,31 +400,31 @@ export function AdminReportsClient({
             <div className="space-y-1">
               <p className="text-xs text-white/50">Course</p>
               <select value={courseId} onChange={(e) => setCourseId(e.target.value)}
-                className="rounded-lg bg-white/5 border border-white/10 text-white/70 px-3 py-1.5 text-sm">
-                <option value="">All courses</option>
-                {courses.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
+                className={FILTER_CONTROL_CLASS}>
+                <option className={FILTER_OPTION_CLASS} value="">All courses</option>
+                {courses.map((c) => <option className={FILTER_OPTION_CLASS} key={c.id} value={c.id}>{c.title}</option>)}
               </select>
             </div>
             <div className="space-y-1">
               <p className="text-xs text-white/50">Status</p>
               <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}
-                className="rounded-lg bg-white/5 border border-white/10 text-white/70 px-3 py-1.5 text-sm">
-                <option value="">All statuses</option>
-                <option value="PASSED">Passed</option>
-                <option value="FAILED">Failed</option>
-                <option value="IN_PROGRESS">In Progress</option>
-                <option value="NOT_STARTED">Not Started</option>
+                className={FILTER_CONTROL_CLASS}>
+                <option className={FILTER_OPTION_CLASS} value="">All statuses</option>
+                <option className={FILTER_OPTION_CLASS} value="PASSED">Passed</option>
+                <option className={FILTER_OPTION_CLASS} value="FAILED">Failed</option>
+                <option className={FILTER_OPTION_CLASS} value="IN_PROGRESS">In Progress</option>
+                <option className={FILTER_OPTION_CLASS} value="NOT_STARTED">Not Started</option>
               </select>
             </div>
             <div className="space-y-1">
               <p className="text-xs text-white/50">From</p>
               <input type="date" value={filterStart} onChange={(e) => setFilterStart(e.target.value)}
-                className="rounded-lg bg-white/5 border border-white/10 text-white/70 px-3 py-1.5 text-sm" />
+                className={FILTER_CONTROL_CLASS} />
             </div>
             <div className="space-y-1">
               <p className="text-xs text-white/50">To</p>
               <input type="date" value={filterEnd} onChange={(e) => setFilterEnd(e.target.value)}
-                className="rounded-lg bg-white/5 border border-white/10 text-white/70 px-3 py-1.5 text-sm" />
+                className={FILTER_CONTROL_CLASS} />
             </div>
             <Button onClick={exportCompletions} className="bg-[#cc3d00] text-white hover:bg-[#b33400] h-8 px-3">
               <Download className="h-3.5 w-3.5 mr-1" /> Download CSV
@@ -440,12 +443,12 @@ export function AdminReportsClient({
               <select
                 value={selectedUserId}
                 onChange={(e) => setSelectedUserId(e.target.value)}
-                className="w-full rounded-lg bg-white/5 border border-white/10 text-white/70 px-3 py-1.5 text-sm"
+                className={`w-full ${FILTER_CONTROL_CLASS}`}
               >
-                {loadingUsers && <option value="">Loading users...</option>}
-                {!loadingUsers && users.length === 0 && <option value="">No users found</option>}
+                {loadingUsers && <option className={FILTER_OPTION_CLASS} value="">Loading users...</option>}
+                {!loadingUsers && users.length === 0 && <option className={FILTER_OPTION_CLASS} value="">No users found</option>}
                 {!loadingUsers && users.map((u) => (
-                  <option key={u.id} value={u.id}>
+                  <option className={FILTER_OPTION_CLASS} key={u.id} value={u.id}>
                     {(u.name ?? "Unnamed user") + " · " + u.email}
                   </option>
                 ))}
@@ -457,7 +460,7 @@ export function AdminReportsClient({
                 type="date"
                 value={filterStart}
                 onChange={(e) => setFilterStart(e.target.value)}
-                className="rounded-lg bg-white/5 border border-white/10 text-white/70 px-3 py-1.5 text-sm"
+                className={FILTER_CONTROL_CLASS}
               />
             </div>
             <div className="space-y-1">
@@ -466,7 +469,7 @@ export function AdminReportsClient({
                 type="date"
                 value={filterEnd}
                 onChange={(e) => setFilterEnd(e.target.value)}
-                className="rounded-lg bg-white/5 border border-white/10 text-white/70 px-3 py-1.5 text-sm"
+                className={FILTER_CONTROL_CLASS}
               />
             </div>
             <Button onClick={loadUserSummary} variant="outline" className="border-white/10 text-white/60 hover:bg-white/10 h-8 px-3">
@@ -568,9 +571,9 @@ export function AdminReportsClient({
             <div className="space-y-1">
               <p className="text-xs text-white/50">Filter by course</p>
               <select value={courseId} onChange={(e) => { setCourseId(e.target.value); }}
-                className="rounded-lg bg-white/5 border border-white/10 text-white/70 px-3 py-1.5 text-sm">
-                <option value="">All courses</option>
-                {courses.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
+                className={FILTER_CONTROL_CLASS}>
+                <option className={FILTER_OPTION_CLASS} value="">All courses</option>
+                {courses.map((c) => <option className={FILTER_OPTION_CLASS} key={c.id} value={c.id}>{c.title}</option>)}
               </select>
             </div>
             <Button onClick={loadEffectiveness} variant="outline" className="border-white/10 text-white/60 hover:bg-white/10 h-8 px-3">
