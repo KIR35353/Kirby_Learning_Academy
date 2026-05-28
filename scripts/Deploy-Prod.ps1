@@ -368,7 +368,11 @@ function Main {
         # Verify deployment
         $buildOk = Verify-Build
         $pm2Ok = Get-PM2Status
-        $httpOk = $NoVerify ? $true : (Test-HTTPHealth)
+        if ($NoVerify) {
+            $httpOk = $true
+        } else {
+            $httpOk = Test-HTTPHealth
+        }
         
         Write-Info ""
         if ($buildOk -and $pm2Ok -and $httpOk) {
