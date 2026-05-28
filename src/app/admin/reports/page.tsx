@@ -46,7 +46,7 @@ export default async function AdminReportsPage() {
             courses={courses}
             tenants={tenants}
             isSuperAdmin={isSuperAdmin}
-            defaultTenantId={session.user.tenantId}
+            defaultTenantId={isSuperAdmin ? "" : session.user.tenantId}
           />
         </main>
       </div>

@@ -46,13 +46,15 @@ export async function GET(
   defaultStart.setDate(defaultStart.getDate() - 90);
   const rangeStart = toDateOrDefault(searchParams.get("startDate"), defaultStart);
 
-  // Super admins can query other tenants, others see only their own
-  const tenantId = isSuperAdmin(session) && tenantIdParam ? tenantIdParam : session.user.tenantId;
+  // Super admins can query a single tenant or all tenants when tenantId is omitted.
+  const tenantId = isSuperAdmin(session)
+    ? tenantIdParam
+    : session.user.tenantId;
 
   const user = await db.user.findFirst({
     where: {
       id: userId,
-      tenantId,
+      ...(tenantId ? { tenantId } : {}),
     },
     select: {
       id: true,
@@ -98,14 +100,14 @@ export async function GET(
       by: ["status"],
       where: {
         userId,
-        tenantId,
+        ...(tenantId ? { tenantId } : {}),
       },
       _count: { status: true },
     }),
     db.enrollment.count({
       where: {
         userId,
-        tenantId,
+        ...(tenantId ? { tenantId } : {}),
         status: { in: ["NOT_STARTED", "IN_PROGRESS"] },
         dueDate: { lt: now },
       },
@@ -113,7 +115,7 @@ export async function GET(
     db.enrollment.count({
       where: {
         userId,
-        tenantId,
+        ...(tenantId ? { tenantId } : {}),
         status: { in: ["PASSED", "COMPLETED"] },
         completedAt: { gte: rangeStart, lte: rangeEnd },
       },
@@ -122,7 +124,7 @@ export async function GET(
       by: ["status"],
       where: {
         userId,
-        tenantId,
+        ...(tenantId ? { tenantId } : {}),
         startedAt: { gte: rangeStart, lte: rangeEnd },
       },
       _count: { status: true },
@@ -130,7 +132,7 @@ export async function GET(
     db.assessmentAttempt.aggregate({
       where: {
         userId,
-        tenantId,
+        ...(tenantId ? { tenantId } : {}),
         startedAt: { gte: rangeStart, lte: rangeEnd },
       },
       _avg: { score: true },
@@ -147,7 +149,7 @@ export async function GET(
     db.enrollment.findMany({
       where: {
         userId,
-        tenantId,
+        ...(tenantId ? { tenantId } : {}),
         status: { in: ["PASSED", "COMPLETED", "FAILED"] },
         completedAt: { gte: rangeStart, lte: rangeEnd },
       },
@@ -162,7 +164,7 @@ export async function GET(
     db.assessmentAttempt.findMany({
       where: {
         userId,
-        tenantId,
+        ...(tenantId ? { tenantId } : {}),
         startedAt: { gte: rangeStart, lte: rangeEnd },
       },
       select: {
@@ -177,7 +179,7 @@ export async function GET(
     }),
     db.user.findMany({
       where: {
-        tenantId,
+        ...(tenantId ? { tenantId } : {}),
         isActive: true,
       },
       select: { id: true, name: true, email: true },
@@ -186,7 +188,7 @@ export async function GET(
     db.enrollment.groupBy({
       by: ["userId", "status"],
       where: {
-        tenantId: session.user.tenantId,
+        ...(tenantId ? { tenantId } : {}),
         user: { isActive: true },
       },
       _count: { status: true },
@@ -194,7 +196,7 @@ export async function GET(
     db.authEvent.count({
       where: {
         userId,
-        tenantId: session.user.tenantId,
+        ...(tenantId ? { tenantId } : {}),
         eventType: "LOGIN_FAILED",
         createdAt: { gte: rangeStart, lte: rangeEnd },
       },

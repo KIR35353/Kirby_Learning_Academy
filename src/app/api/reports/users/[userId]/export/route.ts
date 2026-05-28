@@ -65,11 +65,13 @@ export async function GET(
   defaultStart.setDate(defaultStart.getDate() - 90);
   const rangeStart = toDateOrDefault(searchParams.get("startDate"), defaultStart);
 
-  // Super admins can query other tenants, others see only their own
-  const tenantId = isSuperAdmin(session) && tenantIdParam ? tenantIdParam : session.user.tenantId;
+  // Super admins can query a single tenant or all tenants when tenantId is omitted.
+  const tenantId = isSuperAdmin(session)
+    ? tenantIdParam
+    : session.user.tenantId;
 
   const user = await db.user.findFirst({
-    where: { id: userId, tenantId },
+    where: { id: userId, ...(tenantId ? { tenantId } : {}) },
     select: {
       id: true,
       name: true,
@@ -101,7 +103,7 @@ export async function GET(
     db.authEvent.count({
       where: {
         userId,
-        tenantId,
+        ...(tenantId ? { tenantId } : {}),
         eventType: "LOGIN_FAILED",
         createdAt: { gte: rangeStart, lte: rangeEnd },
       },
@@ -112,7 +114,7 @@ export async function GET(
       orderBy: { createdAt: "desc" },
     }),
     db.enrollment.findMany({
-      where: { userId, tenantId },
+      where: { userId, ...(tenantId ? { tenantId } : {}) },
       select: {
         status: true,
         createdAt: true,
@@ -125,7 +127,7 @@ export async function GET(
     db.assessmentAttempt.findMany({
       where: {
         userId,
-        tenantId,
+        ...(tenantId ? { tenantId } : {}),
         startedAt: { gte: rangeStart, lte: rangeEnd },
       },
       select: {
@@ -148,7 +150,7 @@ export async function GET(
         db.enrollment.findMany({
           where: {
             userId,
-            tenantId: session.user.tenantId,
+            ...(tenantId ? { tenantId } : {}),
             status: { in: ["PASSED", "COMPLETED", "FAILED"] },
             completedAt: { gte: rangeStart, lte: rangeEnd },
           },
@@ -163,7 +165,7 @@ export async function GET(
         db.assessmentAttempt.findMany({
           where: {
             userId,
-            tenantId: session.user.tenantId,
+            ...(tenantId ? { tenantId } : {}),
             startedAt: { gte: rangeStart, lte: rangeEnd },
           },
           select: {

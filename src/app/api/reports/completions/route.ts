@@ -8,6 +8,11 @@ function isAdmin(session: Session | null): boolean {
   return roles.some((r) => ["SUPER_ADMIN", "TENANT_ADMIN", "MANAGER"].includes(r));
 }
 
+function isSuperAdmin(session: Session | null): boolean {
+  const roles = session?.user?.roles ?? [];
+  return roles.includes("SUPER_ADMIN");
+}
+
 // GET /api/reports/completions
 // Training completion report with filters
 // ?courseId=&departmentId=&startDate=&endDate=&status=&export=csv
@@ -22,12 +27,18 @@ export async function GET(req: NextRequest) {
   const startDate = searchParams.get("startDate");
   const endDate = searchParams.get("endDate");
   const status = searchParams.get("status") ?? undefined;
+  const tenantIdParam = searchParams.get("tenantId") ?? undefined;
   const exportCsv = searchParams.get("export") === "csv";
   const page = parseInt(searchParams.get("page") ?? "1");
   const pageSize = exportCsv ? 5000 : 50;
 
+  // Super admins can target a single tenant or all tenants when tenantId is omitted.
+  const tenantId = isSuperAdmin(session)
+    ? tenantIdParam
+    : session.user.tenantId;
+
   const where = {
-    tenantId: session.user.tenantId,
+    ...(tenantId ? { tenantId } : {}),
     ...(courseId ? { courseId } : {}),
     ...(departmentId ? { user: { departmentId } } : {}),
     ...(status ? { status: status as "PASSED" | "FAILED" | "COMPLETED" | "IN_PROGRESS" | "NOT_STARTED" } : {}),

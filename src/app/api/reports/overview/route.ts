@@ -8,6 +8,11 @@ function isAdmin(session: Session | null): boolean {
   return roles.some((r) => ["SUPER_ADMIN", "TENANT_ADMIN", "MANAGER"].includes(r));
 }
 
+function isSuperAdmin(session: Session | null): boolean {
+  const roles = session?.user?.roles ?? [];
+  return roles.includes("SUPER_ADMIN");
+}
+
 // GET /api/reports/overview
 // Returns org-wide KPIs for the admin/compliance dashboard
 export async function GET(req: NextRequest) {
@@ -15,11 +20,16 @@ export async function GET(req: NextRequest) {
   if (!session?.user || !isAdmin(session))
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const tenantId = session.user.tenantId;
   const { searchParams } = new URL(req.url);
   const departmentId = searchParams.get("departmentId") ?? undefined;
+  const tenantIdParam = searchParams.get("tenantId") ?? undefined;
 
-  const userWhere = { tenantId, isActive: true, ...(departmentId ? { departmentId } : {}) };
+  // Super admins can target a single tenant or all tenants when tenantId is omitted.
+  const tenantId = isSuperAdmin(session)
+    ? tenantIdParam
+    : session.user.tenantId;
+
+  const userWhere = { ...(tenantId ? { tenantId } : {}), isActive: true, ...(departmentId ? { departmentId } : {}) };
 
   const [
     totalUsers,
@@ -34,19 +44,19 @@ export async function GET(req: NextRequest) {
 
     db.enrollment.groupBy({
       by: ["status"],
-      where: { tenantId, ...(departmentId ? { user: { departmentId } } : {}) },
+      where: { ...(tenantId ? { tenantId } : {}), ...(departmentId ? { user: { departmentId } } : {}) },
       _count: { status: true },
     }),
 
     db.certificationRecord.groupBy({
       by: ["status"],
-      where: { tenantId, ...(departmentId ? { user: { departmentId } } : {}) },
+      where: { ...(tenantId ? { tenantId } : {}), ...(departmentId ? { user: { departmentId } } : {}) },
       _count: { status: true },
     }),
 
     db.enrollment.findMany({
       where: {
-        tenantId,
+        ...(tenantId ? { tenantId } : {}),
         status: { in: ["PASSED", "FAILED", "COMPLETED"] },
         completedAt: { gte: new Date(Date.now() - 30 * 86400000) },
         ...(departmentId ? { user: { departmentId } } : {}),
@@ -61,7 +71,7 @@ export async function GET(req: NextRequest) {
 
     db.enrollment.count({
       where: {
-        tenantId,
+        ...(tenantId ? { tenantId } : {}),
         status: { in: ["NOT_STARTED", "IN_PROGRESS"] },
         dueDate: { lt: new Date() },
         ...(departmentId ? { user: { departmentId } } : {}),
@@ -69,7 +79,7 @@ export async function GET(req: NextRequest) {
     }),
 
     db.course.findMany({
-      where: { tenantId },
+      where: { ...(tenantId ? { tenantId } : {}) },
       select: {
         id: true, title: true,
         _count: { select: { enrollments: true } },
@@ -82,8 +92,8 @@ export async function GET(req: NextRequest) {
     db.$queryRawUnsafe<{ month: string; count: bigint }[]>(`
       SELECT TO_CHAR("completedAt", 'YYYY-MM') as month, COUNT(*) as count
       FROM enrollments
-      WHERE "tenantId" = '${tenantId}'
-        AND "completedAt" >= NOW() - INTERVAL '6 months'
+      WHERE "completedAt" >= NOW() - INTERVAL '6 months'
+        ${tenantId ? `AND "tenantId" = '${tenantId}'` : ""}
         ${departmentId ? `AND "userId" IN (SELECT id FROM users WHERE "departmentId" = '${departmentId}')` : ""}
       GROUP BY month
       ORDER BY month ASC

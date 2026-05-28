@@ -8,6 +8,11 @@ function isAdmin(session: Session | null): boolean {
   return roles.some((r) => ["SUPER_ADMIN", "TENANT_ADMIN", "MANAGER"].includes(r));
 }
 
+function isSuperAdmin(session: Session | null): boolean {
+  const roles = session?.user?.roles ?? [];
+  return roles.includes("SUPER_ADMIN");
+}
+
 // GET /api/reports/course-effectiveness
 // Avg score, completion rate, pass rate per course
 export async function GET(req: NextRequest) {
@@ -17,9 +22,15 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url);
   const courseId = searchParams.get("courseId") ?? undefined;
+  const tenantIdParam = searchParams.get("tenantId") ?? undefined;
+
+  // Super admins can target a single tenant or all tenants when tenantId is omitted.
+  const tenantId = isSuperAdmin(session)
+    ? tenantIdParam
+    : session.user.tenantId;
 
   const courses = await db.course.findMany({
-    where: { tenantId: session.user.tenantId, ...(courseId ? { id: courseId } : {}) },
+    where: { ...(tenantId ? { tenantId } : {}), ...(courseId ? { id: courseId } : {}) },
     select: {
       id: true, title: true, status: true,
       enrollments: {

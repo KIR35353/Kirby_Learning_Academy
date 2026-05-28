@@ -25,12 +25,14 @@ export async function GET(req: NextRequest) {
   const departmentId = searchParams.get("departmentId") ?? undefined;
   const tenantIdParam = searchParams.get("tenantId") ?? undefined;
 
-  // Super admins can query other tenants, others see only their own
-  const tenantId = isSuperAdmin(session) && tenantIdParam ? tenantIdParam : session.user.tenantId;
+  // Super admins can query a single tenant or all tenants when tenantId is omitted.
+  const tenantId = isSuperAdmin(session)
+    ? tenantIdParam
+    : session.user.tenantId;
 
   const users = await db.user.findMany({
     where: {
-      tenantId,
+      ...(tenantId ? { tenantId } : {}),
       isActive: true,
       ...(departmentId ? { departmentId } : {}),
     },

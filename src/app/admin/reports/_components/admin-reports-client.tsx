@@ -157,19 +157,25 @@ export function AdminReportsClient({
 
   const loadOverview = useCallback(async () => {
     setLoadingOverview(true);
-    const params = deptId ? `?departmentId=${deptId}` : "";
-    const res = await fetch(`/api/reports/overview${params}`);
+    const params = new URLSearchParams();
+    if (deptId) params.set("departmentId", deptId);
+    if (isSuperAdmin && selectedTenantId) params.set("tenantId", selectedTenantId);
+    const qs = params.toString();
+    const res = await fetch(`/api/reports/overview${qs ? `?${qs}` : ""}`);
     if (res.ok) setOverview(await res.json());
     setLoadingOverview(false);
-  }, [deptId]);
+  }, [deptId, isSuperAdmin, selectedTenantId]);
 
   const loadEffectiveness = useCallback(async () => {
     setLoadingEff(true);
-    const params = courseId ? `?courseId=${courseId}` : "";
-    const res = await fetch(`/api/reports/course-effectiveness${params}`);
+    const params = new URLSearchParams();
+    if (courseId) params.set("courseId", courseId);
+    if (isSuperAdmin && selectedTenantId) params.set("tenantId", selectedTenantId);
+    const qs = params.toString();
+    const res = await fetch(`/api/reports/course-effectiveness${qs ? `?${qs}` : ""}`);
     if (res.ok) setEffectiveness(await res.json());
     setLoadingEff(false);
-  }, [courseId]);
+  }, [courseId, isSuperAdmin, selectedTenantId]);
 
   const loadUsers = useCallback(async () => {
     setLoadingUsers(true);
@@ -223,6 +229,7 @@ export function AdminReportsClient({
     if (filterStatus) p.set("status", filterStatus);
     if (filterStart) p.set("startDate", filterStart);
     if (filterEnd) p.set("endDate", filterEnd);
+    if (isSuperAdmin && selectedTenantId) p.set("tenantId", selectedTenantId);
     window.open(`/api/reports/completions?${p.toString()}`, "_blank");
   }
 
@@ -257,7 +264,7 @@ export function AdminReportsClient({
           {isSuperAdmin && (
             <select value={selectedTenantId} onChange={(e) => setSelectedTenantId(e.target.value)}
               className={FILTER_CONTROL_CLASS}>
-              <option className={FILTER_OPTION_CLASS} value="">Select tenant...</option>
+              <option className={FILTER_OPTION_CLASS} value="">All Tenants</option>
               {tenants.map((t) => <option className={FILTER_OPTION_CLASS} key={t.id} value={t.id}>{t.name}</option>)}
             </select>
           )}
