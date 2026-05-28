@@ -325,7 +325,7 @@ export function UsersTable({ departments, locations, allRoles, tenants, isSuperA
                     <TooltipProvider>
                       <div className="flex items-center justify-end gap-2">
                         <Tooltip>
-                          <TooltipTrigger asChild>
+                          <TooltipTrigger>
                             <Button
                               variant="ghost"
                               size="sm"
@@ -340,7 +340,7 @@ export function UsersTable({ departments, locations, allRoles, tenants, isSuperA
                         </Tooltip>
                         {user.isActive && (
                           <Tooltip>
-                            <TooltipTrigger asChild>
+                            <TooltipTrigger>
                               <Button
                                 variant="ghost"
                                 size="sm"
@@ -355,7 +355,7 @@ export function UsersTable({ departments, locations, allRoles, tenants, isSuperA
                           </Tooltip>
                         )}
                         <Tooltip>
-                          <TooltipTrigger asChild>
+                          <TooltipTrigger>
                             <Button
                               variant="ghost"
                               size="sm"
