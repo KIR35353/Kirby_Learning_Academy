@@ -10,6 +10,11 @@ function isAdmin(session: Session | null): boolean {
   );
 }
 
+function isSuperAdmin(session: Session | null): boolean {
+  const roles = session?.user?.roles ?? [];
+  return roles.includes("SUPER_ADMIN");
+}
+
 type EnrollmentStatus = "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED" | "PASSED" | "FAILED" | "EXPIRED";
 
 function toDateOrDefault(value: string | null, fallback: Date): Date {
@@ -54,13 +59,17 @@ export async function GET(
   const { userId } = await params;
   const { searchParams } = new URL(req.url);
 
+  const tenantIdParam = searchParams.get("tenantId") ?? undefined;
   const rangeEnd = toDateOrDefault(searchParams.get("endDate"), new Date());
   const defaultStart = new Date(rangeEnd);
   defaultStart.setDate(defaultStart.getDate() - 90);
   const rangeStart = toDateOrDefault(searchParams.get("startDate"), defaultStart);
 
+  // Super admins can query other tenants, others see only their own
+  const tenantId = isSuperAdmin(session) && tenantIdParam ? tenantIdParam : session.user.tenantId;
+
   const user = await db.user.findFirst({
-    where: { id: userId, tenantId: session.user.tenantId },
+    where: { id: userId, tenantId },
     select: {
       id: true,
       name: true,
@@ -92,7 +101,7 @@ export async function GET(
     db.authEvent.count({
       where: {
         userId,
-        tenantId: session.user.tenantId,
+        tenantId,
         eventType: "LOGIN_FAILED",
         createdAt: { gte: rangeStart, lte: rangeEnd },
       },
@@ -103,7 +112,7 @@ export async function GET(
       orderBy: { createdAt: "desc" },
     }),
     db.enrollment.findMany({
-      where: { userId, tenantId: session.user.tenantId },
+      where: { userId, tenantId },
       select: {
         status: true,
         createdAt: true,
@@ -116,7 +125,7 @@ export async function GET(
     db.assessmentAttempt.findMany({
       where: {
         userId,
-        tenantId: session.user.tenantId,
+        tenantId,
         startedAt: { gte: rangeStart, lte: rangeEnd },
       },
       select: {

@@ -8,6 +8,11 @@ function isAdmin(session: Session | null): boolean {
   return roles.some((r) => ["SUPER_ADMIN", "TENANT_ADMIN", "MANAGER", "COMPLIANCE_OFFICER"].includes(r));
 }
 
+function isSuperAdmin(session: Session | null): boolean {
+  const roles = session?.user?.roles ?? [];
+  return roles.includes("SUPER_ADMIN");
+}
+
 // GET /api/reports/users
 // Returns active tenant users for user-report selection
 export async function GET(req: NextRequest) {
@@ -18,10 +23,14 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url);
   const departmentId = searchParams.get("departmentId") ?? undefined;
+  const tenantIdParam = searchParams.get("tenantId") ?? undefined;
+
+  // Super admins can query other tenants, others see only their own
+  const tenantId = isSuperAdmin(session) && tenantIdParam ? tenantIdParam : session.user.tenantId;
 
   const users = await db.user.findMany({
     where: {
-      tenantId: session.user.tenantId,
+      tenantId,
       isActive: true,
       ...(departmentId ? { departmentId } : {}),
     },

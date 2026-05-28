@@ -49,6 +49,11 @@ interface UserOption {
   jobTitle: string | null;
 }
 
+interface Tenant {
+  id: string;
+  name: string;
+}
+
 interface UserSummary {
   user: {
     id: string;
@@ -120,8 +125,14 @@ function StatCard({ icon, label, value, sub }: { icon: React.ReactNode; label: s
 // ── Main component ──────────────────────────────────────────────────────────
 
 export function AdminReportsClient({
-  departments, courses,
-}: { departments: Dept[]; courses: CourseSummary[] }) {
+  departments, courses, tenants = [], isSuperAdmin = false, defaultTenantId = "",
+}: { 
+  departments: Dept[]; 
+  courses: CourseSummary[];
+  tenants?: Tenant[];
+  isSuperAdmin?: boolean;
+  defaultTenantId?: string;
+}) {
   const [overview, setOverview] = useState<OverviewData | null>(null);
   const [effectiveness, setEffectiveness] = useState<CourseEffRow[]>([]);
   const [users, setUsers] = useState<UserOption[]>([]);
@@ -133,6 +144,7 @@ export function AdminReportsClient({
   const [deptId, setDeptId] = useState("");
   const [courseId, setCourseId] = useState("");
   const [selectedUserId, setSelectedUserId] = useState("");
+  const [selectedTenantId, setSelectedTenantId] = useState(defaultTenantId);
   const [activeTab, setActiveTab] = useState<"overview" | "completions" | "effectiveness" | "userPerformance">("overview");
 
   // Completion report filters
@@ -158,8 +170,11 @@ export function AdminReportsClient({
 
   const loadUsers = useCallback(async () => {
     setLoadingUsers(true);
-    const params = deptId ? `?departmentId=${deptId}` : "";
-    const res = await fetch(`/api/reports/users${params}`);
+    const params = new URLSearchParams();
+    if (deptId) params.set("departmentId", deptId);
+    if (isSuperAdmin && selectedTenantId) params.set("tenantId", selectedTenantId);
+    const qs = params.toString();
+    const res = await fetch(`/api/reports/users${qs ? `?${qs}` : ""}`);
     if (res.ok) {
       const data: UserOption[] = await res.json();
       setUsers(data);
@@ -171,7 +186,7 @@ export function AdminReportsClient({
       }
     }
     setLoadingUsers(false);
-  }, [deptId, selectedUserId]);
+  }, [deptId, selectedTenantId, isSuperAdmin, selectedUserId]);
 
   const loadUserSummary = useCallback(async () => {
     if (!selectedUserId) {
@@ -182,11 +197,12 @@ export function AdminReportsClient({
     const params = new URLSearchParams();
     if (filterStart) params.set("startDate", filterStart);
     if (filterEnd) params.set("endDate", filterEnd);
+    if (isSuperAdmin && selectedTenantId) params.set("tenantId", selectedTenantId);
     const qs = params.toString();
     const res = await fetch(`/api/reports/users/${selectedUserId}/summary${qs ? `?${qs}` : ""}`);
     if (res.ok) setUserSummary(await res.json());
     setLoadingUserSummary(false);
-  }, [selectedUserId, filterStart, filterEnd]);
+  }, [selectedUserId, filterStart, filterEnd, selectedTenantId, isSuperAdmin]);
 
   useEffect(() => { if (activeTab === "overview") loadOverview(); }, [activeTab, loadOverview]);
   useEffect(() => { if (activeTab === "effectiveness") loadEffectiveness(); }, [activeTab, loadEffectiveness]);
@@ -212,6 +228,7 @@ export function AdminReportsClient({
     const p = new URLSearchParams();
     if (filterStart) p.set("startDate", filterStart);
     if (filterEnd) p.set("endDate", filterEnd);
+    if (isSuperAdmin && selectedTenantId) p.set("tenantId", selectedTenantId);
     window.open(`/api/reports/users/${selectedUserId}/export?${p.toString()}`, "_blank");
   }
 
@@ -234,6 +251,13 @@ export function AdminReportsClient({
           <p className="text-sm text-white/50">Org-wide training and compliance metrics</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          {isSuperAdmin && (
+            <select value={selectedTenantId} onChange={(e) => setSelectedTenantId(e.target.value)}
+              className="rounded-lg bg-white/5 border border-white/10 text-white/70 px-3 py-1.5 text-sm">
+              <option value="">Select tenant...</option>
+              {tenants.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+          )}
           <select value={deptId} onChange={(e) => setDeptId(e.target.value)}
             className="rounded-lg bg-white/5 border border-white/10 text-white/70 px-3 py-1.5 text-sm">
             <option value="">All departments</option>
