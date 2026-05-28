@@ -88,6 +88,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     data: {
       ...data,
       ...(data.status === "ARCHIVED" ? { archivedAt: new Date() } : {}),
+      ...(data.status !== "ARCHIVED" && existing.status === "ARCHIVED"
+        ? { archivedAt: null }
+        : {}),
       ...(data.status === "PUBLISHED" && !existing.archivedAt
         ? { archivedAt: null }
         : {}),

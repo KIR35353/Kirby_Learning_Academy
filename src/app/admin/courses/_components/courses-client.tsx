@@ -16,6 +16,7 @@ import {
   Eye,
   RefreshCw,
   Trash2,
+  RotateCcw,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -85,6 +86,16 @@ export function CoursesClient({ initialCourses, isSuperAdmin, currentTenantId, t
   async function handleArchive(course: CourseRow) {
     if (!confirm(`Archive "${course.title}"? It will be removed from the catalog.`)) return;
     await fetch(`/api/admin/courses/${course.id}`, { method: "DELETE" });
+    startTransition(() => { refresh(); });
+  }
+
+  async function handleUnarchive(course: CourseRow) {
+    if (!confirm(`Restore "${course.title}" to published status?`)) return;
+    await fetch(`/api/admin/courses/${course.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "PUBLISHED" }),
+    });
     startTransition(() => { refresh(); });
   }
 
@@ -304,6 +315,13 @@ export function CoursesClient({ initialCourses, isSuperAdmin, currentTenantId, t
                           {course.status === "ARCHIVED" && (
                             <>
                               <div className="my-1 h-px bg-white/10" />
+                              <DropdownMenuItem
+                                className="text-emerald-400 focus:text-emerald-300"
+                                onClick={() => handleUnarchive(course)}
+                              >
+                                <RotateCcw className="mr-2 h-3.5 w-3.5" />
+                                Restore
+                              </DropdownMenuItem>
                               <DropdownMenuItem
                                 className="text-red-500 focus:text-red-400 focus:bg-red-950/40"
                                 onClick={() => handlePermanentDelete(course)}
