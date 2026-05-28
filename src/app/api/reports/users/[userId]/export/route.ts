@@ -106,12 +106,12 @@ export async function GET(
       where: { userId, tenantId: session.user.tenantId },
       select: {
         status: true,
-        enrolledAt: true,
+        createdAt: true,
         completedAt: true,
         dueDate: true,
         course: { select: { title: true, category: true } },
       },
-      orderBy: { enrolledAt: "desc" },
+      orderBy: { createdAt: "desc" },
     }),
     db.assessmentAttempt.findMany({
       where: {
