@@ -1,5 +1,4 @@
 import { db } from "@/lib/db";
-import { parse } from "date-fns";
 
 /**
  * Worker: Daily User Stats Materialization
