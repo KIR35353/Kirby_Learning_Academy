@@ -249,7 +249,7 @@ export async function GET(
         e.course.title,
         e.course.category ?? "",
         e.status,
-        e.enrolledAt?.toLocaleDateString() ?? "",
+        e.createdAt?.toLocaleDateString() ?? "",
         e.dueDate?.toLocaleDateString() ?? "",
         e.completedAt?.toLocaleDateString() ?? "",
       ]),
