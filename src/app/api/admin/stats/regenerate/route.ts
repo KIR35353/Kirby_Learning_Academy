@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import type { Session } from "next-auth";
 import { db } from "@/lib/db";
-import { generateDailyUserStats } from "@/workers/daily-user-stats.worker";
+import { generateDailyUserStats } from "../../../../../../../workers/daily-user-stats.worker";
 
 function isSuperAdmin(session: Session | null): boolean {
   const roles = session?.user?.roles ?? [];
