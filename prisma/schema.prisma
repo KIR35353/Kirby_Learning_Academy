@@ -47,6 +47,8 @@ model Tenant {
   certifications       Certification[]
   complianceRequirements ComplianceRequirement[]
   auditLogs            AuditLog[]
+  authEvents          AuthEvent[]
+  dailyUserStats      DailyUserStats[]
   notifications        Notification[]
   jobSchedules         JobSchedule[]
   badges               Badge[]
@@ -200,6 +202,8 @@ model User {
   courseRatings         CourseRating[]
   leaderboardOpts       LeaderboardOptOut[]
   completionHistory     CourseCompletionHistory[]
+  authEvents            AuthEvent[]
+  dailyUserStats        DailyUserStats[]
 
   @@index([tenantId])
   @@index([email])
@@ -244,6 +248,35 @@ model Session {
 
   @@index([userId])
   @@map("sessions")
+}
+
+// ── Auth Events (login success/failure tracking) ────────────────────────────
+enum AuthEventType {
+  LOGIN_SUCCESS
+  LOGIN_FAILED
+  LOGOUT
+}
+
+model AuthEvent {
+  id         String        @id @default(cuid())
+  tenantId   String?       // null for failed logins before tenant resolution
+  userId     String?       // null for failed logins; set for successful
+  email      String?       // normalized email attempt
+  eventType  AuthEventType
+  provider   String        // "credentials" | "microsoft-entra-id" | "sso"
+  reason     String?       // failure reason: "invalid_credentials" | "account_inactive" | "rate_limited" | "tenant_not_found"
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime      @default(now())
+
+  tenant Tenant?  @relation(fields: [tenantId], references: [id])
+  user   User?    @relation(fields: [userId], references: [id])
+
+  @@index([tenantId])
+  @@index([userId])
+  @@index([createdAt])
+  @@index([email])
+  @@map("auth_events")
 }
 
 // ── OAuth / SAML Accounts (NextAuth) ────────────────────────────────────────
@@ -1053,19 +1086,54 @@ model JobSchedule {
   id          String    @id @default(cuid())
   tenantId    String
   name        String
-  jobType     String    // "cert_expiry_scan" | "overdue_escalation" | "recurrent_assignment"
+  jobType     String    // "cert_expiry_scan" | "overdue_escalation" | "recurrent_assignment" | "daily_user_stats"
   cronExpr    String    // cron expression e.g. "0 6 * * *"
   payload     Json?
   isActive    Boolean   @default(true)
   lastRunAt   DateTime?
-  nextRunAt   DateTime?
   createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  tenant Tenant @relation(fields: [tenantId], references: [id])
 
   @@index([tenantId])
   @@map("job_schedules")
+}
+
+// ── Daily User Stats (materialized reporting metrics) ────────────────────────
+// Pre-aggregated daily snapshots to enable fast reporting queries
+// Populated by the daily_user_stats job; covers: logins, courses, assessments
+model DailyUserStats {
+  id            String    @id @default(cuid())
+  tenantId      String
+  userId        String
+  statDate      DateTime  // midnight UTC of the day these stats cover
+  
+  // Login metrics
+  successfulLogins  Int   @default(0)
+  failedLogins      Int   @default(0)
+  
+  // Course metrics (cumulative as of statDate)
+  coursesCompleted  Int   @default(0)
+  coursesInProgress Int   @default(0)
+  coursesFailed     Int   @default(0)
+  coursesOverdue    Int   @default(0)
+  courseCompletionRate Int @default(0) // 0-100 percentile
+  
+  // Assessment metrics (cumulative as of statDate)
+  assessmentsPassed   Int @default(0)
+  assessmentsFailed   Int @default(0)
+  assessmentPassRate  Int @default(0) // 0-100 percentile
+  assessmentAvgScore  Float? // null if no attempts
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@unique([tenantId, userId, statDate])
+  @@index([tenantId, statDate])
+  @@index([userId])
+  @@index([statDate])
+  @@map("daily_user_stats")
 }
 
 // ══════════════════════════════════════════════════════════════════════════════

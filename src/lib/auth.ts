@@ -249,5 +249,27 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       console.log("[session:output]", { displayName: (session.user as any)?.displayName, rolesCount: (session.user as any)?.roles?.length });
       return session;
     },
-  },
+    async signIn({ user, account }) {
+      // Log successful login
+      if (user?.id && user?.email) {
+        try {
+          await db.authEvent.create({
+            data: {
+              userId: user.id,
+              tenantId: (user as any).tenantId || null,
+              email: user.email,
+              eventType: "LOGIN_SUCCESS",
+              provider: account?.provider === "microsoft-entra-id" ? "microsoft-entra-id" : "credentials",
+              ipAddress: null, // Will be captured by middleware if needed
+              userAgent: null, // Will be captured by middleware if needed
+            },
+          }).catch((err) => {
+            console.error("[auth:login_log_error]", err);
+          });
+        } catch (err) {
+          console.error("[auth:signIn_log_error]", err);
+        }
+      }
+      return true; // Allow sign-in
+    },
 });

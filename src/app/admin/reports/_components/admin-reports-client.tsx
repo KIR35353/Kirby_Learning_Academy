@@ -9,7 +9,17 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Download, RefreshCw, Users, BookOpen, CheckCircle2, AlertTriangle } from "lucide-react";
+import {
+  Download,
+  RefreshCw,
+  Users,
+  BookOpen,
+  CheckCircle2,
+  AlertTriangle,
+  Activity,
+  Trophy,
+  XCircle,
+} from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -29,6 +39,58 @@ interface CourseEffRow {
   id: string; title: string; status: string;
   totalEnrollments: number; completionRate: number; passRate: number; avgScore: number | null;
   avgTimeMinutes: number | null;
+}
+
+interface UserOption {
+  id: string;
+  name: string | null;
+  email: string;
+  department: string | null;
+  jobTitle: string | null;
+}
+
+interface UserSummary {
+  user: {
+    id: string;
+    name: string | null;
+    email: string;
+    department: string | null;
+    jobTitle: string | null;
+    joinedAt: string;
+  };
+  logins: {
+    successful: number;
+    failed: number;
+    lastLoginAt: string | null;
+  };
+  courses: {
+    total: number;
+    completed: number;
+    inProgress: number;
+    notStarted: number;
+    failed: number;
+    overdue: number;
+    completionRate: number;
+    completionsInWindow: number;
+  };
+  assessments: {
+    totalAttempts: number;
+    passed: number;
+    failed: number;
+    inProgress: number;
+    passRate: number;
+    avgScore: number | null;
+  };
+  ranking: {
+    rank: number;
+    totalUsers: number;
+    percentile: number;
+  };
+  recentActivity: Array<{
+    type: "LOGIN" | "COURSE" | "ASSESSMENT";
+    label: string;
+    timestamp: string;
+  }>;
 }
 
 const PIE_COLORS = ["#22c55e", "#eab308", "#ef4444", "#94a3b8", "#f97316"];
@@ -62,11 +124,16 @@ export function AdminReportsClient({
 }: { departments: Dept[]; courses: CourseSummary[] }) {
   const [overview, setOverview] = useState<OverviewData | null>(null);
   const [effectiveness, setEffectiveness] = useState<CourseEffRow[]>([]);
+  const [users, setUsers] = useState<UserOption[]>([]);
+  const [userSummary, setUserSummary] = useState<UserSummary | null>(null);
   const [loadingOverview, setLoadingOverview] = useState(true);
   const [loadingEff, setLoadingEff] = useState(true);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [loadingUserSummary, setLoadingUserSummary] = useState(false);
   const [deptId, setDeptId] = useState("");
   const [courseId, setCourseId] = useState("");
-  const [activeTab, setActiveTab] = useState<"overview" | "completions" | "effectiveness">("overview");
+  const [selectedUserId, setSelectedUserId] = useState("");
+  const [activeTab, setActiveTab] = useState<"overview" | "completions" | "effectiveness" | "userPerformance">("overview");
 
   // Completion report filters
   const [filterStatus, setFilterStatus] = useState("");
@@ -89,8 +156,46 @@ export function AdminReportsClient({
     setLoadingEff(false);
   }, [courseId]);
 
+  const loadUsers = useCallback(async () => {
+    setLoadingUsers(true);
+    const params = deptId ? `?departmentId=${deptId}` : "";
+    const res = await fetch(`/api/reports/users${params}`);
+    if (res.ok) {
+      const data: UserOption[] = await res.json();
+      setUsers(data);
+      if (data.length === 0) {
+        setSelectedUserId("");
+        setUserSummary(null);
+      } else if (!data.some((u) => u.id === selectedUserId)) {
+        setSelectedUserId(data[0].id);
+      }
+    }
+    setLoadingUsers(false);
+  }, [deptId, selectedUserId]);
+
+  const loadUserSummary = useCallback(async () => {
+    if (!selectedUserId) {
+      setUserSummary(null);
+      return;
+    }
+    setLoadingUserSummary(true);
+    const params = new URLSearchParams();
+    if (filterStart) params.set("startDate", filterStart);
+    if (filterEnd) params.set("endDate", filterEnd);
+    const qs = params.toString();
+    const res = await fetch(`/api/reports/users/${selectedUserId}/summary${qs ? `?${qs}` : ""}`);
+    if (res.ok) setUserSummary(await res.json());
+    setLoadingUserSummary(false);
+  }, [selectedUserId, filterStart, filterEnd]);
+
   useEffect(() => { if (activeTab === "overview") loadOverview(); }, [activeTab, loadOverview]);
   useEffect(() => { if (activeTab === "effectiveness") loadEffectiveness(); }, [activeTab, loadEffectiveness]);
+  useEffect(() => {
+    if (activeTab === "userPerformance") loadUsers();
+  }, [activeTab, loadUsers]);
+  useEffect(() => {
+    if (activeTab === "userPerformance" && selectedUserId) loadUserSummary();
+  }, [activeTab, selectedUserId, filterStart, filterEnd, loadUserSummary]);
 
   function exportCompletions() {
     const p = new URLSearchParams({ export: "csv" });
@@ -102,10 +207,19 @@ export function AdminReportsClient({
     window.open(`/api/reports/completions?${p.toString()}`, "_blank");
   }
 
+  function exportUserReport() {
+    if (!selectedUserId) return;
+    const p = new URLSearchParams();
+    if (filterStart) p.set("startDate", filterStart);
+    if (filterEnd) p.set("endDate", filterEnd);
+    window.open(`/api/reports/users/${selectedUserId}/export?${p.toString()}`, "_blank");
+  }
+
   const tabs: { key: typeof activeTab; label: string }[] = [
     { key: "overview", label: "Overview" },
     { key: "completions", label: "Completions Report" },
     { key: "effectiveness", label: "Course Effectiveness" },
+    { key: "userPerformance", label: "User Performance" },
   ];
 
   const certPieData = overview ? Object.entries(overview.certifications.byStatus).map(([name, value]) => ({ name, value })) : [];
@@ -125,7 +239,11 @@ export function AdminReportsClient({
             <option value="">All departments</option>
             {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
           </select>
-          <Button onClick={loadOverview} variant="outline" className="border-white/10 text-white/60 hover:bg-white/10 h-8 px-3">
+          <Button
+            onClick={activeTab === "effectiveness" ? loadEffectiveness : activeTab === "userPerformance" ? loadUserSummary : loadOverview}
+            variant="outline"
+            className="border-white/10 text-white/60 hover:bg-white/10 h-8 px-3"
+          >
             <RefreshCw className="h-3.5 w-3.5 mr-1" /> Refresh
           </Button>
           <Button onClick={exportCompletions} className="bg-[#cc3d00] text-white hover:bg-[#b33400] h-8 px-3">
@@ -286,6 +404,136 @@ export function AdminReportsClient({
             </Button>
           </div>
           <p className="text-sm text-white/40">Use the filters above and click Download CSV to export filtered completion data.</p>
+        </div>
+      )}
+
+      {/* ── USER PERFORMANCE TAB ─────────────────────────────────────────── */}
+      {activeTab === "userPerformance" && (
+        <div className="space-y-5">
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="space-y-1 min-w-[260px]">
+              <p className="text-xs text-white/50">User</p>
+              <select
+                value={selectedUserId}
+                onChange={(e) => setSelectedUserId(e.target.value)}
+                className="w-full rounded-lg bg-white/5 border border-white/10 text-white/70 px-3 py-1.5 text-sm"
+              >
+                {loadingUsers && <option value="">Loading users...</option>}
+                {!loadingUsers && users.length === 0 && <option value="">No users found</option>}
+                {!loadingUsers && users.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {(u.name ?? "Unnamed user") + " · " + u.email}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs text-white/50">From</p>
+              <input
+                type="date"
+                value={filterStart}
+                onChange={(e) => setFilterStart(e.target.value)}
+                className="rounded-lg bg-white/5 border border-white/10 text-white/70 px-3 py-1.5 text-sm"
+              />
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs text-white/50">To</p>
+              <input
+                type="date"
+                value={filterEnd}
+                onChange={(e) => setFilterEnd(e.target.value)}
+                className="rounded-lg bg-white/5 border border-white/10 text-white/70 px-3 py-1.5 text-sm"
+              />
+            </div>
+            <Button onClick={loadUserSummary} variant="outline" className="border-white/10 text-white/60 hover:bg-white/10 h-8 px-3">
+              <RefreshCw className="h-3.5 w-3.5 mr-1" /> Load
+            </Button>
+            <Button
+              onClick={exportUserReport}
+              disabled={!selectedUserId || !userSummary}
+              className="bg-[#cc3d00] text-white hover:bg-[#b33400] h-8 px-3 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <Download className="h-3.5 w-3.5 mr-1" /> Export CSV
+            </Button>
+          </div>
+
+          {loadingUserSummary ? (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-xl bg-white/5" />)}
+            </div>
+          ) : userSummary ? (
+            <>
+              <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+                <p className="text-sm text-white/80">
+                  {userSummary.user.name ?? "Unnamed user"} <span className="text-white/40">({userSummary.user.email})</span>
+                </p>
+                <p className="text-xs text-white/40 mt-1">
+                  {userSummary.user.department ?? "No department"}
+                  {userSummary.user.jobTitle ? ` · ${userSummary.user.jobTitle}` : ""}
+                  {` · Joined ${new Date(userSummary.user.joinedAt).toLocaleDateString()}`}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <StatCard icon={<Activity className="h-5 w-5 text-blue-400" />} label="Logins" value={`${userSummary.logins.successful} / ${userSummary.logins.failed}`} sub={`${userSummary.logins.failed > 0 ? `${userSummary.logins.failed} failed · ` : ""}${userSummary.logins.lastLoginAt ? `Last: ${new Date(userSummary.logins.lastLoginAt).toLocaleString()}` : "No login recorded"}`} />
+                <StatCard icon={<CheckCircle2 className="h-5 w-5 text-green-400" />} label="Course Completions" value={userSummary.courses.completed} sub={`${userSummary.courses.completionRate}% completion rate`} />
+                <StatCard icon={<BookOpen className="h-5 w-5 text-amber-400" />} label="In Progress" value={userSummary.courses.inProgress} sub={`${userSummary.courses.overdue} overdue`} />
+                <StatCard icon={<XCircle className="h-5 w-5 text-red-400" />} label="Failures" value={userSummary.courses.failed + userSummary.assessments.failed} sub="Courses + assessments" />
+                <StatCard icon={<Trophy className="h-5 w-5 text-yellow-400" />} label="Ranking" value={`#${userSummary.ranking.rank}/${userSummary.ranking.totalUsers}`} sub={`${userSummary.ranking.percentile}th percentile`} />
+                <StatCard icon={<CheckCircle2 className="h-5 w-5 text-emerald-400" />} label="Assessment Pass Rate" value={`${userSummary.assessments.passRate}%`} sub={`${userSummary.assessments.totalAttempts} attempts`} />
+                <StatCard icon={<AlertTriangle className="h-5 w-5 text-orange-400" />} label="Window Completions" value={userSummary.courses.completionsInWindow} sub="within selected date range" />
+                <StatCard icon={<Users className="h-5 w-5 text-indigo-400" />} label="Total Assignments" value={userSummary.courses.total} sub={`${userSummary.courses.notStarted} not started`} />
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="rounded-xl border border-white/10 bg-white/5 overflow-hidden">
+                  <h3 className="text-sm font-medium text-white/70 px-4 py-3 border-b border-white/10">Course Status Breakdown</h3>
+                  <table className="w-full text-sm">
+                    <tbody className="divide-y divide-white/5">
+                      <tr><td className="px-4 py-2 text-white/60">Completed</td><td className="px-4 py-2 text-right text-white">{userSummary.courses.completed}</td></tr>
+                      <tr><td className="px-4 py-2 text-white/60">In Progress</td><td className="px-4 py-2 text-right text-white">{userSummary.courses.inProgress}</td></tr>
+                      <tr><td className="px-4 py-2 text-white/60">Not Started</td><td className="px-4 py-2 text-right text-white">{userSummary.courses.notStarted}</td></tr>
+                      <tr><td className="px-4 py-2 text-white/60">Failed</td><td className="px-4 py-2 text-right text-white">{userSummary.courses.failed}</td></tr>
+                      <tr><td className="px-4 py-2 text-white/60">Overdue</td><td className="px-4 py-2 text-right text-white">{userSummary.courses.overdue}</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="rounded-xl border border-white/10 bg-white/5 overflow-hidden">
+                  <h3 className="text-sm font-medium text-white/70 px-4 py-3 border-b border-white/10">Assessment Summary</h3>
+                  <table className="w-full text-sm">
+                    <tbody className="divide-y divide-white/5">
+                      <tr><td className="px-4 py-2 text-white/60">Total Attempts</td><td className="px-4 py-2 text-right text-white">{userSummary.assessments.totalAttempts}</td></tr>
+                      <tr><td className="px-4 py-2 text-white/60">Passed</td><td className="px-4 py-2 text-right text-white">{userSummary.assessments.passed}</td></tr>
+                      <tr><td className="px-4 py-2 text-white/60">Failed</td><td className="px-4 py-2 text-right text-white">{userSummary.assessments.failed}</td></tr>
+                      <tr><td className="px-4 py-2 text-white/60">In Progress</td><td className="px-4 py-2 text-right text-white">{userSummary.assessments.inProgress}</td></tr>
+                      <tr><td className="px-4 py-2 text-white/60">Average Score</td><td className="px-4 py-2 text-right text-white">{userSummary.assessments.avgScore !== null ? `${userSummary.assessments.avgScore}%` : "—"}</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-white/10 bg-white/5 overflow-hidden">
+                <h3 className="text-sm font-medium text-white/70 px-4 py-3 border-b border-white/10">Recent Activity</h3>
+                <div className="divide-y divide-white/5">
+                  {userSummary.recentActivity.length === 0 && (
+                    <p className="px-4 py-6 text-sm text-white/40">No recent activity in selected date range.</p>
+                  )}
+                  {userSummary.recentActivity.map((item, idx) => (
+                    <div key={`${item.type}-${item.timestamp}-${idx}`} className="flex items-center justify-between gap-3 px-4 py-3">
+                      <div>
+                        <p className="text-sm text-white/80">{item.label}</p>
+                        <p className="text-xs text-white/40">{item.type}</p>
+                      </div>
+                      <span className="text-xs text-white/40 shrink-0">{new Date(item.timestamp).toLocaleString()}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          ) : (
+            <p className="text-sm text-white/40">Select a user to load the report.</p>
+          )}
         </div>
       )}
 
